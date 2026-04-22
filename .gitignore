@@ -1,0 +1,15 @@
+# 本機工具設定
+.playwright-mcp/
+
+# 子專案（各自管理）
+telegram-coach-bot/
+
+# 截圖
+*.png
+*.jpg
+*.jpeg
+
+# Python
+__pycache__/
+*.pyc
+.env

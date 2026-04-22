@@ -95,44 +95,23 @@ def scrape_nike(sku: str) -> dict:
                 "status": f"error: {e}", "url": ""}
 
 
-def scrape_shopee(keyword: str) -> dict:
-    """搜尋蝦皮 TW，回傳平均售價（TWD）"""
-    url = "https://shopee.tw/api/v4/search/search_items/"
-    params = {
-        "by": "relevance",
-        "keyword": keyword,
-        "limit": 20,
-        "newest": 0,
-        "order": "desc",
-        "page_type": "search",
-        "version": 2,
-    }
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Referer": f"https://shopee.tw/search?keyword={keyword}",
-        "X-Shopee-Language": "zh-Hant",
-        "X-Requested-With": "XMLHttpRequest",
-    }
+def scrape_pchome(keyword: str) -> dict:
+    """搜尋 PChome 24h，回傳平均售價（TWD）"""
+    search_url = f"https://ecshweb.pchome.com.tw/search/v3.3/all/results?q={keyword}&page=1&sort=rnk/dc"
     try:
-        res = requests.get(url, params=params, headers=headers, timeout=10)
+        res = requests.get(search_url, headers=_ABC_HEADERS, timeout=10)
         res.raise_for_status()
-        items = res.json().get("items", []) or []
+        prods = res.json().get("prods", []) or []
 
-        prices = []
-        for item in items:
-            info = item.get("item_basic") or item
-            price_raw = info.get("price") or info.get("price_min")
-            if price_raw:
-                prices.append(int(price_raw) // 100000)  # Shopee 價格單位為 1/100000 TWD
-
+        prices = [int(p["price"]) for p in prods if p.get("price")]
         if not prices:
-            return {"platform": "Shopee TW", "keyword": keyword, "price": None,
+            return {"platform": "PChome 24h", "keyword": keyword, "price": None,
                     "currency": "TWD", "status": "not_found",
-                    "url": f"https://shopee.tw/search?keyword={keyword}"}
+                    "url": f"https://24h.pchome.com.tw/search/?q={keyword}"}
 
         avg_price = sum(prices) // len(prices)
         return {
-            "platform": "Shopee TW",
+            "platform": "PChome 24h",
             "keyword": keyword,
             "price": avg_price,
             "price_min": min(prices),
@@ -140,12 +119,12 @@ def scrape_shopee(keyword: str) -> dict:
             "sample_count": len(prices),
             "currency": "TWD",
             "status": "ok",
-            "url": f"https://shopee.tw/search?keyword={keyword}",
+            "url": f"https://24h.pchome.com.tw/search/?q={keyword}",
         }
     except Exception as e:
-        return {"platform": "Shopee TW", "keyword": keyword, "price": None,
+        return {"platform": "PChome 24h", "keyword": keyword, "price": None,
                 "currency": "TWD", "status": f"error: {e}",
-                "url": f"https://shopee.tw/search?keyword={keyword}"}
+                "url": f"https://24h.pchome.com.tw/search/?q={keyword}"}
 
 
 def scrape_yahoo_auctions(keyword: str) -> dict:

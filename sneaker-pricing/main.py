@@ -2,7 +2,7 @@
 
 import argparse
 from src.search import search_product
-from src.scraper import scrape_abc_mart, scrape_nike, scrape_yahoo_auctions, scrape_shopee
+from src.scraper import scrape_abc_mart, scrape_nike, scrape_yahoo_auctions, scrape_pchome
 from src.pricing import calculate_price
 
 
@@ -18,6 +18,8 @@ def cmd_search(args):
     print(f"\n鞋款：{result['name']}" + (f"  SKU: {sku}" if sku else ""))
     print("-" * 52)
 
+    pchome_keyword = result.get("pchome_keyword")
+
     platforms = []
     if abc_keyword:
         platforms.append(scrape_abc_mart(abc_keyword))
@@ -25,6 +27,8 @@ def cmd_search(args):
         platforms.append(scrape_nike(sku))
     if yahoo_keyword:
         platforms.append(scrape_yahoo_auctions(yahoo_keyword))
+    if pchome_keyword:
+        platforms.append(scrape_pchome(pchome_keyword))
 
     for data in platforms:
         price = data.get("price")
