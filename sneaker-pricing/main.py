@@ -2,7 +2,7 @@
 
 import argparse
 from src.search import search_product
-from src.scraper import scrape_abc_mart, scrape_nike, scrape_stockx
+from src.scraper import scrape_abc_mart, scrape_nike, scrape_yahoo_auctions
 from src.pricing import calculate_price
 
 
@@ -14,23 +14,29 @@ def cmd_search(args):
 
     sku = result.get("sku")
     abc_keyword = result.get("abc_keyword")
+    yahoo_keyword = result.get("yahoo_keyword")
     print(f"\n鞋款：{result['name']}" + (f"  SKU: {sku}" if sku else ""))
-    print("-" * 48)
+    print("-" * 52)
 
     platforms = []
     if abc_keyword:
         platforms.append(scrape_abc_mart(abc_keyword))
     if sku:
         platforms.append(scrape_nike(sku))
-        platforms.append(scrape_stockx(sku))
+    if yahoo_keyword:
+        platforms.append(scrape_yahoo_auctions(yahoo_keyword))
 
     for data in platforms:
         price = data.get("price")
         status = data.get("status", "")
+        currency = data.get("currency", "")
         if price is not None:
-            print(f"{data['platform']:14}  {price:>8,} {data['currency']}")
+            extra = ""
+            if "sample_count" in data:
+                extra = f"  (n={data['sample_count']}, 最低 {data['price_min']:,} / 最高 {data['price_max']:,})"
+            print(f"{data['platform']:16}  {price:>8,} {currency}{extra}")
         else:
-            print(f"{data['platform']:14}  {'—':>8}  ({status})")
+            print(f"{data['platform']:16}  {'—':>8}  ({status})")
     print()
 
 

@@ -95,14 +95,39 @@ def scrape_nike(sku: str) -> dict:
                 "status": f"error: {e}", "url": ""}
 
 
-def scrape_stockx(sku: str) -> dict:
-    """抓取 StockX 市場均價（USD）
-    TODO: 用 requests 實作（需處理反爬）
-    """
-    return {
-        "platform": "StockX",
-        "sku": sku,
-        "price": 120,
-        "currency": "USD",
-        "url": f"https://stockx.com/search?s={sku}",
-    }
+def scrape_yahoo_auctions(keyword: str) -> dict:
+    """搜尋 Yahoo Auctions JP 在售商品，計算平均市場價（JPY）"""
+    search_url = f"https://auctions.yahoo.co.jp/search/search?p={keyword}&va={keyword}&exflg=1&b=1&n=20&s1=cbids&o1=d&st=1"
+    try:
+        res = requests.get(search_url, headers=_ABC_HEADERS, timeout=10)
+        res.raise_for_status()
+        soup = BeautifulSoup(res.text, "html.parser")
+
+        prices = []
+        for item in soup.select(".Product"):
+            price_el = item.select_one(".Product__priceValue")
+            if not price_el:
+                continue
+            digits = re.sub(r"[^\d]", "", price_el.text)
+            if digits:
+                prices.append(int(digits))
+
+        if not prices:
+            return {"platform": "Yahoo Auctions JP", "keyword": keyword, "price": None,
+                    "currency": "JPY", "status": "not_found", "url": search_url}
+
+        avg_price = sum(prices) // len(prices)
+        return {
+            "platform": "Yahoo Auctions JP",
+            "keyword": keyword,
+            "price": avg_price,
+            "price_min": min(prices),
+            "price_max": max(prices),
+            "sample_count": len(prices),
+            "currency": "JPY",
+            "status": "ok",
+            "url": search_url,
+        }
+    except Exception as e:
+        return {"platform": "Yahoo Auctions JP", "keyword": keyword, "price": None,
+                "currency": "JPY", "status": f"error: {e}", "url": search_url}

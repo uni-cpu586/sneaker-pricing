@@ -2,15 +2,15 @@
 from __future__ import annotations
 from typing import Dict, Optional
 
-# 格式：中文暱稱 → (Nike SKU, ABC-MART 關鍵字, 顯示名稱)
+# 格式：中文暱稱 → {sku, abc_keyword, yahoo_keyword, name}
 CATALOG: Dict[str, Dict] = {
-    "熊貓":  {"sku": "DV0831-101", "abc_keyword": "adidas FORUM",   "name": "adidas Forum Low Panda"},
-    "芝加哥": {"sku": "DD1391-100", "abc_keyword": "DUNK LOW",       "name": "Nike Dunk Low Chicago"},
-    "陰陽":  {"sku": "DH1901-105", "abc_keyword": "DUNK LOW",       "name": "Nike Dunk Low Yin Yang"},
-    "倒鉤":  {"sku": "BQ6817-100", "abc_keyword": "AIR JORDAN 1",   "name": "Air Jordan 1 Retro High OG"},
-    "奧利奧": {"sku": "CZ5607-051", "abc_keyword": "DUNK LOW",       "name": "Nike Dunk Low Black White"},
-    "996":   {"sku": None,         "abc_keyword": "U996",           "name": "New Balance 996"},
-    "stan smith": {"sku": None,    "abc_keyword": "STAN SMITH",     "name": "adidas Stan Smith"},
+    "熊貓":  {"sku": "DV0831-101", "abc_keyword": "adidas FORUM",  "yahoo_keyword": "DV0831-101",  "name": "adidas Forum Low Panda"},
+    "芝加哥": {"sku": "DD1391-100", "abc_keyword": "DUNK LOW",      "yahoo_keyword": "DD1391-100",  "name": "Nike Dunk Low Chicago"},
+    "陰陽":  {"sku": "DH1901-105", "abc_keyword": "DUNK LOW",      "yahoo_keyword": "DH1901-105",  "name": "Nike Dunk Low Yin Yang"},
+    "倒鉤":  {"sku": "BQ6817-100", "abc_keyword": "AIR JORDAN 1",  "yahoo_keyword": "BQ6817-100",  "name": "Air Jordan 1 Retro High OG"},
+    "奧利奧": {"sku": "CZ5607-051", "abc_keyword": "DUNK LOW",      "yahoo_keyword": "CZ5607-051",  "name": "Nike Dunk Low Black White"},
+    "996":   {"sku": None,         "abc_keyword": "U996",          "yahoo_keyword": "New Balance 996", "name": "New Balance 996"},
+    "stan smith": {"sku": None,    "abc_keyword": "STAN SMITH",    "yahoo_keyword": "adidas Stan Smith", "name": "adidas Stan Smith"},
 }
 
 # SKU → catalog 快速查詢
@@ -32,7 +32,7 @@ def search_product(query: str) -> Optional[Dict]:
         known = _SKU_INDEX.get(sku)
         if known:
             return {"query": query, **known}
-        # 未知 SKU，只查 Nike，不查 ABC-MART
-        return {"query": query, "sku": sku, "abc_keyword": None, "name": sku}
+        # 未知 SKU，只查 Nike 和 Yahoo，不查 ABC-MART
+        return {"query": query, "sku": sku, "abc_keyword": None, "yahoo_keyword": sku, "name": sku}
 
     return None
