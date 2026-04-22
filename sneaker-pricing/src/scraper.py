@@ -95,6 +95,59 @@ def scrape_nike(sku: str) -> dict:
                 "status": f"error: {e}", "url": ""}
 
 
+def scrape_shopee(keyword: str) -> dict:
+    """搜尋蝦皮 TW，回傳平均售價（TWD）"""
+    url = "https://shopee.tw/api/v4/search/search_items/"
+    params = {
+        "by": "relevance",
+        "keyword": keyword,
+        "limit": 20,
+        "newest": 0,
+        "order": "desc",
+        "page_type": "search",
+        "version": 2,
+    }
+    headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+        "Referer": f"https://shopee.tw/search?keyword={keyword}",
+        "X-Shopee-Language": "zh-Hant",
+        "X-Requested-With": "XMLHttpRequest",
+    }
+    try:
+        res = requests.get(url, params=params, headers=headers, timeout=10)
+        res.raise_for_status()
+        items = res.json().get("items", []) or []
+
+        prices = []
+        for item in items:
+            info = item.get("item_basic") or item
+            price_raw = info.get("price") or info.get("price_min")
+            if price_raw:
+                prices.append(int(price_raw) // 100000)  # Shopee 價格單位為 1/100000 TWD
+
+        if not prices:
+            return {"platform": "Shopee TW", "keyword": keyword, "price": None,
+                    "currency": "TWD", "status": "not_found",
+                    "url": f"https://shopee.tw/search?keyword={keyword}"}
+
+        avg_price = sum(prices) // len(prices)
+        return {
+            "platform": "Shopee TW",
+            "keyword": keyword,
+            "price": avg_price,
+            "price_min": min(prices),
+            "price_max": max(prices),
+            "sample_count": len(prices),
+            "currency": "TWD",
+            "status": "ok",
+            "url": f"https://shopee.tw/search?keyword={keyword}",
+        }
+    except Exception as e:
+        return {"platform": "Shopee TW", "keyword": keyword, "price": None,
+                "currency": "TWD", "status": f"error: {e}",
+                "url": f"https://shopee.tw/search?keyword={keyword}"}
+
+
 def scrape_yahoo_auctions(keyword: str) -> dict:
     """搜尋 Yahoo Auctions JP 在售商品，計算平均市場價（JPY）"""
     search_url = f"https://auctions.yahoo.co.jp/search/search?p={keyword}&va={keyword}&exflg=1&b=1&n=20&s1=cbids&o1=d&st=1"

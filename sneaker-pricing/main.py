@@ -2,7 +2,7 @@
 
 import argparse
 from src.search import search_product
-from src.scraper import scrape_abc_mart, scrape_nike, scrape_yahoo_auctions
+from src.scraper import scrape_abc_mart, scrape_nike, scrape_yahoo_auctions, scrape_shopee
 from src.pricing import calculate_price
 
 
