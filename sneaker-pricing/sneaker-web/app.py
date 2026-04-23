@@ -130,7 +130,8 @@ async def api_search(q: str = ""):
         return JSONResponse({"error": "請輸入鞋款名稱"})
     if cached := _cached(f"s:{q}"):
         return JSONResponse({**cached, "cached": True})
-    result = await asyncio.to_thread(_do_search, q)
+    loop = asyncio.get_event_loop()
+    result = await loop.run_in_executor(None, _do_search, q)
     if "error" not in result:
         _store(f"s:{q}", result)
     return JSONResponse(result)
