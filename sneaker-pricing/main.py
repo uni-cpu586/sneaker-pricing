@@ -4,6 +4,7 @@ import argparse
 from src.search import search_product
 from src.scraper import scrape_abc_mart, scrape_nike, scrape_yahoo_auctions, scrape_pchome, scrape_shopee
 from src.pricing import calculate_price
+from src.db import get_or_create_sneaker, save_prices
 
 
 def cmd_search(args):
@@ -46,6 +47,15 @@ def cmd_search(args):
             print(f"{data['platform']:16}  {'—':>8}  ({status})")
     print()
 
+    # 寫進 Supabase（需設定 .env SUPABASE_URL / SUPABASE_SERVICE_KEY）
+    import os
+    if os.getenv("SUPABASE_URL") and os.getenv("SUPABASE_SERVICE_KEY"):
+        try:
+            sneaker_id = get_or_create_sneaker(result["name"], result.get("sku"))
+            save_prices(sneaker_id, platforms)
+        except Exception as e:
+            print(f"[DB] 寫入失敗：{e}")
+
 
 def cmd_price(args):
     result = calculate_price(
@@ -65,6 +75,40 @@ def cmd_price(args):
     print()
 
 
+def cmd_sync_all(_args=None):
+    """抓取 CATALOG 內所有鞋款並寫入 Supabase（GitHub Actions 用）"""
+    from src.search import CATALOG
+    import os
+    if not (os.getenv("SUPABASE_URL") and os.getenv("SUPABASE_SERVICE_KEY")):
+        print("請設定 SUPABASE_URL 和 SUPABASE_SERVICE_KEY")
+        return
+
+    seen = set()
+    for nickname, entry in CATALOG.items():
+        name = entry["name"]
+        if name in seen:
+            continue
+        seen.add(name)
+
+        sku = entry.get("sku")
+        platforms = []
+        if entry.get("abc_keyword"):
+            platforms.append(scrape_abc_mart(entry["abc_keyword"]))
+        if sku:
+            platforms.append(scrape_nike(sku))
+        if entry.get("yahoo_keyword"):
+            platforms.append(scrape_yahoo_auctions(entry["yahoo_keyword"]))
+        if entry.get("pchome_keyword"):
+            platforms.append(scrape_pchome(entry["pchome_keyword"]))
+
+        try:
+            sneaker_id = get_or_create_sneaker(name, sku)
+            save_prices(sneaker_id, platforms)
+            print(f"[ok] {name}")
+        except Exception as e:
+            print(f"[err] {name}: {e}")
+
+
 def main():
     parser = argparse.ArgumentParser(description="球鞋定價助手")
     sub = parser.add_subparsers(dest="command")
@@ -79,12 +123,16 @@ def main():
     p_price.add_argument("--commission", type=float, default=0.05, help="平台抽成（預設 0.05）")
     p_price.add_argument("--margin", type=float, default=0.15, help="目標毛利率（預設 0.15）")
 
+    sub.add_parser("sync", help="抓取全部鞋款並寫入 Supabase")
+
     args = parser.parse_args()
 
     if args.command == "search":
         cmd_search(args)
     elif args.command == "price":
         cmd_price(args)
+    elif args.command == "sync":
+        cmd_sync_all()
     else:
         parser.print_help()
 
