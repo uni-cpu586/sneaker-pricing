@@ -1,0 +1,14 @@
+{
+  "manifest_version": 3,
+  "name": "C&C 球鞋比價助手",
+  "version": "1.0",
+  "description": "一鍵同步蝦皮 Cookie，讓 C&C 比價資料保持最新",
+  "permissions": ["cookies", "storage"],
+  "host_permissions": [
+    "*://*.shopee.tw/*"
+  ],
+  "action": {
+    "default_popup": "popup.html",
+    "default_title": "C&C Cookie 同步"
+  }
+}
