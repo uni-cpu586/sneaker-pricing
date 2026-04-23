@@ -4,3 +4,5 @@ python-dotenv
 rapidfuzz
 playwright
 supabase
+fastapi
+uvicorn[standard]
