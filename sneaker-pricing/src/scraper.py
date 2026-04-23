@@ -95,6 +95,85 @@ def scrape_nike(sku: str) -> dict:
                 "status": f"error: {e}", "url": ""}
 
 
+def scrape_shopee(keyword: str) -> dict:
+    """搜尋蝦皮 TW，用 Playwright headless browser，需要在 .env 設定 SHOPEE_COOKIE"""
+    import os
+    from urllib.parse import quote
+    from dotenv import load_dotenv
+    from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
+    load_dotenv()
+
+    cookie_str = os.getenv("SHOPEE_COOKIE", "").strip()
+    search_url = f"https://shopee.tw/search?keyword={quote(keyword)}"
+    if not cookie_str:
+        return {"platform": "Shopee TW", "keyword": keyword, "price": None,
+                "currency": "TWD", "status": "no_cookie (請設定 .env SHOPEE_COOKIE)",
+                "url": search_url}
+
+    # 把 cookie string 解析成 list of dicts
+    cookies = []
+    for part in cookie_str.split(";"):
+        part = part.strip()
+        if "=" in part:
+            name, _, value = part.partition("=")
+            cookies.append({"name": name.strip(), "value": value.strip(),
+                            "domain": ".shopee.tw", "path": "/"})
+
+    try:
+        with sync_playwright() as p:
+            browser = p.chromium.launch(headless=True)
+            ctx = browser.new_context(
+                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                locale="zh-TW",
+            )
+            ctx.add_cookies(cookies)
+            page = ctx.new_page()
+
+            with page.expect_response(
+                lambda r: "api/v4/search/search_items" in r.url and r.status == 200,
+                timeout=20000,
+            ) as resp_info:
+                page.goto(search_url, wait_until="domcontentloaded", timeout=20000)
+
+            api_json = resp_info.value.json()
+            browser.close()
+
+        # 90309999 = 未登入 or cookie 過期
+        if (api_json or {}).get("error") == 90309999:
+            return {"platform": "Shopee TW", "keyword": keyword, "price": None,
+                    "currency": "TWD",
+                    "status": "cookie_expired (重新從瀏覽器 DevTools 複製最新 SHOPEE_COOKIE)",
+                    "url": search_url}
+
+        items = (api_json or {}).get("items", []) or []
+        prices = []
+        for item in items:
+            info = item.get("item_basic") or item
+            price_raw = info.get("price") or info.get("price_min")
+            if price_raw:
+                prices.append(int(price_raw) // 100000)
+
+        if not prices:
+            return {"platform": "Shopee TW", "keyword": keyword, "price": None,
+                    "currency": "TWD", "status": "not_found", "url": search_url}
+
+        avg_price = sum(prices) // len(prices)
+        return {
+            "platform": "Shopee TW",
+            "keyword": keyword,
+            "price": avg_price,
+            "price_min": min(prices),
+            "price_max": max(prices),
+            "sample_count": len(prices),
+            "currency": "TWD",
+            "status": "ok",
+            "url": search_url,
+        }
+    except Exception as e:
+        return {"platform": "Shopee TW", "keyword": keyword, "price": None,
+                "currency": "TWD", "status": f"error: {e}", "url": search_url}
+
+
 def scrape_pchome(keyword: str) -> dict:
     """搜尋 PChome 24h，回傳平均售價（TWD）"""
     search_url = f"https://ecshweb.pchome.com.tw/search/v3.3/all/results?q={keyword}&page=1&sort=rnk/dc"

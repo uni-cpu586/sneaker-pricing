@@ -2,7 +2,7 @@
 
 import argparse
 from src.search import search_product
-from src.scraper import scrape_abc_mart, scrape_nike, scrape_yahoo_auctions, scrape_pchome
+from src.scraper import scrape_abc_mart, scrape_nike, scrape_yahoo_auctions, scrape_pchome, scrape_shopee
 from src.pricing import calculate_price
 
 
@@ -19,6 +19,7 @@ def cmd_search(args):
     print("-" * 52)
 
     pchome_keyword = result.get("pchome_keyword")
+    shopee_keyword = result.get("shopee_keyword")
 
     platforms = []
     if abc_keyword:
@@ -29,6 +30,8 @@ def cmd_search(args):
         platforms.append(scrape_yahoo_auctions(yahoo_keyword))
     if pchome_keyword:
         platforms.append(scrape_pchome(pchome_keyword))
+    if shopee_keyword:
+        platforms.append(scrape_shopee(shopee_keyword))
 
     for data in platforms:
         price = data.get("price")
