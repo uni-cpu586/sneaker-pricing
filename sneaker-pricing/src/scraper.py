@@ -114,19 +114,30 @@ def scrape_nike(sku: str) -> dict:
                 "status": f"error: {e}", "url": ""}
 
 
-def scrape_shopee(keyword: str) -> dict:
-    """搜尋蝦皮 TW，用 Playwright headless browser，需要在 .env 設定 SHOPEE_COOKIE"""
+def _load_shopee_cookie() -> str:
+    """優先讀 shopee_cookie.txt，再 fallback .env SHOPEE_COOKIE"""
     import os
-    from urllib.parse import quote
+    from pathlib import Path
     from dotenv import load_dotenv
-    from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
     load_dotenv()
+    cookie_file = Path(__file__).parent.parent / "shopee_cookie.txt"
+    if cookie_file.exists():
+        c = cookie_file.read_text(encoding="utf-8").strip()
+        if c:
+            return c
+    return os.getenv("SHOPEE_COOKIE", "").strip()
 
-    cookie_str = os.getenv("SHOPEE_COOKIE", "").strip()
+
+def scrape_shopee(keyword: str) -> dict:
+    """搜尋蝦皮 TW，用 Playwright headless browser"""
+    from urllib.parse import quote
+    from playwright.sync_api import sync_playwright
+
+    cookie_str = _load_shopee_cookie()
     search_url = f"https://shopee.tw/search?keyword={quote(keyword)}"
     if not cookie_str:
         return {"platform": "Shopee TW", "keyword": keyword, "price": None,
-                "currency": "TWD", "status": "no_cookie (請設定 .env SHOPEE_COOKIE)",
+                "currency": "TWD", "status": "no_cookie",
                 "url": search_url}
 
     # 把 cookie string 解析成 list of dicts

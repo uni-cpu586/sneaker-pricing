@@ -1,0 +1,169 @@
+<!DOCTYPE html>
+<html lang="zh-TW">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>C&C 管理後台</title>
+<style>
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+:root {
+  --bg: #0a0a0a; --card: #161616; --border: #252525;
+  --accent: #F5C518; --green: #22c55e; --red: #ef4444;
+  --text: #f0f0f0; --muted: #6b7280; --radius: 12px;
+}
+body {
+  font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+  background: var(--bg); color: var(--text);
+  min-height: 100vh; max-width: 540px; margin: 0 auto; padding: 32px 16px;
+}
+h1 { font-size: 20px; font-weight: 900; margin-bottom: 4px; }
+h1 span { color: var(--accent); }
+.sub { color: var(--muted); font-size: 13px; margin-bottom: 28px; }
+
+.section { background: var(--card); border: 1px solid var(--border); border-radius: var(--radius); padding: 20px; margin-bottom: 16px; }
+.section h2 { font-size: 14px; font-weight: 700; margin-bottom: 14px; letter-spacing: 0.3px; }
+
+label { display: block; font-size: 12px; color: var(--muted); margin-bottom: 6px; }
+input[type=password], input[type=text], textarea {
+  width: 100%; padding: 12px 14px;
+  background: var(--bg); border: 1px solid var(--border);
+  border-radius: 8px; color: var(--text); font-size: 14px;
+  outline: none; font-family: monospace;
+}
+input:focus, textarea:focus { border-color: var(--accent); }
+textarea { height: 120px; resize: vertical; }
+
+.btn {
+  width: 100%; padding: 14px; margin-top: 12px;
+  border-radius: var(--radius); border: none;
+  background: var(--accent); color: #000;
+  font-size: 15px; font-weight: 800; cursor: pointer;
+}
+.btn:disabled { opacity: 0.5; cursor: default; }
+.btn-secondary {
+  background: var(--card); border: 1px solid var(--border);
+  color: var(--muted); margin-top: 8px;
+}
+
+.status-box {
+  padding: 12px 14px; border-radius: 8px;
+  font-size: 13px; margin-top: 12px; display: none;
+}
+.status-box.ok  { background: rgba(34,197,94,.1); border: 1px solid rgba(34,197,94,.3); color: var(--green); }
+.status-box.err { background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.3); color: var(--red); }
+.status-box.show { display: block; }
+
+.steps { margin: 0; padding-left: 18px; }
+.steps li { margin-bottom: 8px; font-size: 13px; color: var(--muted); line-height: 1.6; }
+.steps code {
+  background: var(--border); padding: 2px 7px;
+  border-radius: 4px; font-size: 12px; color: var(--text);
+}
+
+.current-status { font-size: 12px; color: var(--muted); margin-top: 10px; font-family: monospace; }
+.current-status span { color: var(--accent); }
+</style>
+</head>
+<body>
+
+<h1>C&C <span>管理後台</span></h1>
+<p class="sub">蝦皮 Cookie 更新介面</p>
+
+<!-- 說明 -->
+<div class="section">
+  <h2>📋 如何取得最新 Cookie</h2>
+  <ol class="steps">
+    <li>在電腦瀏覽器用正常方式<strong>登入蝦皮</strong></li>
+    <li>按 <code>F12</code> 開啟 DevTools → 點 <code>Network</code> 分頁</li>
+    <li>在蝦皮隨便搜尋任何東西（例如：nike）</li>
+    <li>在 Network 列表找任何一筆 <code>shopee.tw</code> 的請求，點開</li>
+    <li>找 <code>Request Headers</code> → 複製 <code>cookie:</code> 那整行的值</li>
+    <li>貼到下方欄位並送出</li>
+  </ol>
+</div>
+
+<!-- Token + Cookie 輸入 -->
+<div class="section">
+  <h2>🔑 更新 Cookie</h2>
+
+  <label>管理員 Token</label>
+  <input type="password" id="token" placeholder="貼上 ADMIN_TOKEN" autocomplete="off">
+
+  <label style="margin-top:14px">Cookie 字串</label>
+  <textarea id="cookie" placeholder="貼上從 DevTools 複製的完整 cookie 值…"></textarea>
+
+  <button class="btn" id="submit-btn" onclick="submitCookie()">更新蝦皮 Cookie</button>
+  <button class="btn btn-secondary" onclick="checkStatus()">查看目前 Cookie 狀態</button>
+
+  <div class="status-box" id="status-box"></div>
+  <div class="current-status" id="current-status"></div>
+</div>
+
+<script>
+function showStatus(msg, type) {
+  const box = document.getElementById('status-box');
+  box.textContent = msg;
+  box.className = 'status-box show ' + type;
+}
+
+async function submitCookie() {
+  const token  = document.getElementById('token').value.trim();
+  const cookie = document.getElementById('cookie').value.trim();
+  if (!token) { showStatus('請輸入 Admin Token', 'err'); return; }
+  if (!cookie) { showStatus('Cookie 不能是空的', 'err'); return; }
+
+  const btn = document.getElementById('submit-btn');
+  btn.disabled = true;
+  btn.textContent = '更新中…';
+
+  try {
+    const res = await fetch('/admin/update-shopee-cookie', {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+        'X-Admin-Token': token,
+      },
+      body: JSON.stringify({ cookie }),
+    });
+    const data = await res.json();
+    if (res.ok) {
+      showStatus(`✅ Cookie 更新成功！長度：${data.length} 字元。下次查詢蝦皮時即生效。`, 'ok');
+      document.getElementById('cookie').value = '';
+    } else {
+      showStatus('❌ ' + (data.detail || '更新失敗'), 'err');
+    }
+  } catch (e) {
+    showStatus('❌ 網路錯誤：' + e.message, 'err');
+  } finally {
+    btn.disabled = false;
+    btn.textContent = '更新蝦皮 Cookie';
+  }
+}
+
+async function checkStatus() {
+  const token = document.getElementById('token').value.trim();
+  if (!token) { showStatus('請先輸入 Admin Token', 'err'); return; }
+
+  try {
+    const res = await fetch('/admin/cookie-status', {
+      headers: { 'X-Admin-Token': token },
+    });
+    const data = await res.json();
+    if (res.ok) {
+      const el = document.getElementById('current-status');
+      el.innerHTML = `來源：<span>${data.source}</span> ｜ 長度：<span>${data.length}</span> 字元 ｜ 預覽：<span>${data.preview || '(空)'}</span>`;
+    } else {
+      showStatus('❌ ' + (data.detail || '查詢失敗'), 'err');
+    }
+  } catch (e) {
+    showStatus('❌ 網路錯誤', 'err');
+  }
+}
+
+// 按 Enter 送出
+document.addEventListener('keydown', e => {
+  if (e.key === 'Enter' && e.ctrlKey) submitCookie();
+});
+</script>
+</body>
+</html>

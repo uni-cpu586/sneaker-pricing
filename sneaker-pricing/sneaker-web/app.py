@@ -9,9 +9,10 @@ load_dotenv(Path(__file__).parent.parent / ".env")
 
 sys.path.insert(0, str(Path(__file__).parent.parent))
 
-from fastapi import FastAPI
+from fastapi import FastAPI, Header, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
+from pydantic import BaseModel
 
 app = FastAPI(title="C&C 球鞋比價")
 
@@ -177,8 +178,49 @@ async def api_trending():
     return JSONResponse(result)
 
 
+_COOKIE_FILE = Path(__file__).parent.parent / "shopee_cookie.txt"
+
+
+class CookiePayload(BaseModel):
+    cookie: str
+
+
+@app.post("/admin/update-shopee-cookie")
+async def update_shopee_cookie(
+    payload: CookiePayload,
+    x_admin_token: str = Header(default=""),
+):
+    expected = os.getenv("ADMIN_TOKEN", "")
+    if not expected or x_admin_token != expected:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    cookie = payload.cookie.strip()
+    if not cookie:
+        raise HTTPException(status_code=400, detail="Cookie 不能是空的")
+    _COOKIE_FILE.write_text(cookie, encoding="utf-8")
+    # 清掉 Shopee 相關 cache，讓下次查詢用新 cookie
+    for k in list(_cache.keys()):
+        del _cache[k]
+    return JSONResponse({"ok": True, "length": len(cookie)})
+
+
+@app.get("/admin/cookie-status")
+async def cookie_status(x_admin_token: str = Header(default="")):
+    expected = os.getenv("ADMIN_TOKEN", "")
+    if not expected or x_admin_token != expected:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    if _COOKIE_FILE.exists():
+        c = _COOKIE_FILE.read_text(encoding="utf-8").strip()
+        return JSONResponse({"source": "file", "length": len(c), "preview": c[:40] + "…"})
+    return JSONResponse({"source": "env", "length": len(os.getenv("SHOPEE_COOKIE", ""))})
+
+
 _static = Path(__file__).parent / "static"
 app.mount("/static", StaticFiles(directory=str(_static)), name="static")
+
+
+@app.get("/admin")
+async def admin_page():
+    return FileResponse(str(_static / "admin.html"))
 
 
 @app.get("/")
