@@ -199,7 +199,8 @@ body {
 .p-type { font-size: 11px; color: var(--muted); margin-top: 2px; }
 .p-price { font-size: 16px; font-weight: 800; text-align: right; }
 .p-price.official { color: var(--green); }
-.p-price.no-data { color: var(--muted); font-size: 13px; font-weight: 400; }
+.p-price.no-data { color: var(--accent); font-size: 13px; font-weight: 600; }
+.p-price.no-data.no-url { color: var(--muted); font-weight: 400; }
 .p-range { font-size: 11px; color: var(--muted); text-align: right; margin-top: 2px; }
 .official-dot { display: inline-block; width: 6px; height: 6px; background: var(--green); border-radius: 50%; margin-left: 5px; vertical-align: middle; }
 
@@ -599,8 +600,10 @@ function renderResult(data) {
       if (p.sample_count > 1) {
         priceHtml += `<div class="p-range">NT$${Math.round(p.price_min).toLocaleString()} ~ NT$${Math.round(p.price_max).toLocaleString()}（${p.sample_count} 筆）</div>`;
       }
+    } else if (p.url) {
+      priceHtml = `<div class="p-price no-data">點此查看 →</div>`;
     } else {
-      priceHtml = `<div class="p-price no-data">查無資料</div>`;
+      priceHtml = `<div class="p-price no-data no-url">查無資料</div>`;
     }
 
     row.innerHTML = `
