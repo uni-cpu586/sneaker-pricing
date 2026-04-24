@@ -68,6 +68,18 @@ input:focus { border-color: var(--accent); }
 
 #last-synced { font-size: 10px; color: var(--muted); text-align: center; margin-top: 6px; }
 
+.status-row { display: flex; align-items: center; gap: 6px; margin-bottom: 10px; }
+.status-row .backend-status { flex: 1; margin-bottom: 0; }
+.refresh-btn {
+  flex-shrink: 0; width: 28px; height: 28px;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: 6px; color: var(--muted); font-size: 14px;
+  cursor: pointer; display: flex; align-items: center; justify-content: center;
+  transition: color .15s;
+}
+.refresh-btn:hover { color: var(--accent); border-color: var(--accent); }
+.refresh-btn:disabled { opacity: .4; cursor: default; }
+
 details { margin-top: 12px; }
 summary { font-size: 11px; color: var(--muted); cursor: pointer; user-select: none; }
 .settings-body { margin-top: 10px; display: flex; flex-direction: column; gap: 10px; }
@@ -83,7 +95,10 @@ summary { font-size: 11px; color: var(--muted); cursor: pointer; user-select: no
   <span id="status-text">檢查登入狀態中…</span>
 </div>
 
-<div class="backend-status checking" id="backend-status">後端 Cookie 狀態：檢查中…</div>
+<div class="status-row">
+  <div class="backend-status checking" id="backend-status">後端 Cookie 狀態：檢查中…</div>
+  <button class="refresh-btn" id="refresh-btn" onclick="refreshStatus()" title="重新檢查">↻</button>
+</div>
 
 <button class="btn" id="sync-btn" onclick="syncCookie()" disabled>同步蝦皮 Cookie</button>
 

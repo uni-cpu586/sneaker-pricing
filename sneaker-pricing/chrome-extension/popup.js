@@ -93,8 +93,8 @@ async function syncCookie() {
     const data = await res.json();
     if (res.ok) {
       const now = new Date().toLocaleString('zh-TW', { hour12: false });
-      await chrome.storage.local.set({ lastSynced: now });
-      updateLastSynced(now);
+      await chrome.storage.local.set({ lastSynced: now, autoSynced: false });
+      updateLastSynced(now, false);
 
       btn.textContent = '✅ 已同步';
       btn.style.background = 'var(--green)';
@@ -117,9 +117,20 @@ async function syncCookie() {
   }
 }
 
-function updateLastSynced(ts) {
+async function refreshStatus() {
+  const btn = $('refresh-btn');
+  btn.disabled    = true;
+  btn.textContent = '…';
+  await checkBackendCookie();
+  btn.disabled    = false;
+  btn.textContent = '↻';
+}
+
+function updateLastSynced(ts, auto) {
   const el = $('last-synced');
-  if (el) el.textContent = ts ? `上次同步：${ts}` : '';
+  if (!el) return;
+  if (!ts) { el.textContent = ''; return; }
+  el.textContent = auto ? `自動同步：${ts}` : `上次同步：${ts}`;
 }
 
 async function saveSettings() {
@@ -137,11 +148,15 @@ function showResult(msg, type) {
 }
 
 (async () => {
-  const { backendUrl, adminToken, lastSynced } = await loadSettings();
+  const stored = await new Promise(resolve =>
+    chrome.storage.local.get(['backendUrl', 'adminToken', 'lastSynced', 'autoSynced'], resolve)
+  );
+  const backendUrl = stored.backendUrl || DEFAULT_BACKEND;
+  const adminToken = stored.adminToken || DEFAULT_TOKEN;
   $('backend-url').value = backendUrl;
   $('admin-token').value = adminToken;
   if (!backendUrl) $('settings-panel').open = true;
-  updateLastSynced(lastSynced);
+  updateLastSynced(stored.lastSynced, stored.autoSynced);
   await checkLogin();
   await checkBackendCookie();
 })();
