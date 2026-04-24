@@ -148,7 +148,7 @@ def _parse_shopee_items(items: list) -> list:
 
 
 def scrape_shopee(keyword: str) -> dict:
-    """搜尋蝦皮 TW；有 cookie 先試 requests 快路，再用 Playwright 無 cookie 取匿名 session"""
+    """搜尋蝦皮 TW；需要有效 cookie 才能查詢"""
     cookie_str = _load_shopee_cookie()
     search_url = f"https://shopee.tw/search?keyword={quote(keyword)}"
     api_url = (
@@ -157,53 +157,22 @@ def scrape_shopee(keyword: str) -> dict:
         f"&page_type=search&scenario=PAGE_GLOBAL_SEARCH&version=2"
     )
 
-    # ── 快路：有 cookie 且未過期時才試 requests ──────────────
-    if cookie_str:
-        try:
-            r = requests.get(api_url, headers={
-                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-                "Cookie": cookie_str,
-                "Referer": search_url,
-                "x-api-source": "pc",
-            }, timeout=10)
-            d = r.json()
-            if d.get("error") != 90309999:
-                items = d.get("items", []) or []
-                prices = _parse_shopee_items(items)
-                if prices:
-                    return {
-                        "platform": "Shopee TW", "keyword": keyword,
-                        "price": sum(prices) // len(prices),
-                        "price_min": min(prices), "price_max": max(prices),
-                        "sample_count": len(prices),
-                        "currency": "TWD", "status": "ok", "url": search_url,
-                    }
-                return {"platform": "Shopee TW", "keyword": keyword, "price": None,
-                        "currency": "TWD", "status": "not_found", "url": search_url}
-        except Exception:
-            pass
+    if not cookie_str:
+        return {"platform": "Shopee TW", "keyword": keyword, "price": None,
+                "currency": "TWD", "status": "no_cookie", "url": search_url}
 
-    # ── Playwright：不帶 cookie，讓 Shopee 自動發匿名 session ──
-    from playwright.sync_api import sync_playwright
     try:
-        with sync_playwright() as p:
-            browser = p.chromium.launch(headless=True)
-            ctx = browser.new_context(
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-                locale="zh-TW",
-                viewport={"width": 1280, "height": 800},
-                extra_http_headers={"Accept-Language": "zh-TW,zh;q=0.9"},
-            )
-            page = ctx.new_page()
-            with page.expect_response(
-                lambda r: "api/v4/search/search_items" in r.url and r.status == 200,
-                timeout=28000,
-            ) as resp_info:
-                page.goto(search_url, wait_until="domcontentloaded", timeout=28000)
-            api_json = resp_info.value.json()
-            browser.close()
-
-        items = (api_json or {}).get("items", []) or []
+        r = requests.get(api_url, headers={
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            "Cookie": cookie_str,
+            "Referer": search_url,
+            "x-api-source": "pc",
+        }, timeout=10)
+        d = r.json()
+        if d.get("error") == 90309999:
+            return {"platform": "Shopee TW", "keyword": keyword, "price": None,
+                    "currency": "TWD", "status": "cookie_expired", "url": search_url}
+        items = d.get("items", []) or []
         prices = _parse_shopee_items(items)
         if not prices:
             return {"platform": "Shopee TW", "keyword": keyword, "price": None,
