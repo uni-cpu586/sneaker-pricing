@@ -148,82 +148,66 @@ def _parse_shopee_items(items: list) -> list:
 
 
 def scrape_shopee(keyword: str) -> dict:
-    """搜尋蝦皮 TW；先試 requests 快路，再 fallback Playwright"""
+    """搜尋蝦皮 TW；有 cookie 先試 requests 快路，再用 Playwright 無 cookie 取匿名 session"""
     cookie_str = _load_shopee_cookie()
     search_url = f"https://shopee.tw/search?keyword={quote(keyword)}"
-    if not cookie_str:
-        return {"platform": "Shopee TW", "keyword": keyword, "price": None,
-                "currency": "TWD", "status": "no_cookie", "url": search_url}
-
-    # ── 快路：直接 requests ──────────────────────────────────
     api_url = (
         f"https://shopee.tw/api/v4/search/search_items"
         f"?by=relevancy&keyword={quote(keyword)}&limit=20&newest=0&order=desc"
         f"&page_type=search&scenario=PAGE_GLOBAL_SEARCH&version=2"
     )
-    try:
-        r = requests.get(api_url, headers={
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-            "Cookie": cookie_str,
-            "Referer": search_url,
-            "x-api-source": "pc",
-        }, timeout=10)
-        d = r.json()
-        if d.get("error") != 90309999:
-            items = d.get("items", []) or []
-            prices = _parse_shopee_items(items)
-            if prices:
-                return {
-                    "platform": "Shopee TW", "keyword": keyword,
-                    "price": sum(prices) // len(prices),
-                    "price_min": min(prices), "price_max": max(prices),
-                    "sample_count": len(prices),
-                    "currency": "TWD", "status": "ok", "url": search_url,
-                }
-            return {"platform": "Shopee TW", "keyword": keyword, "price": None,
-                    "currency": "TWD", "status": "not_found", "url": search_url}
-    except Exception:
-        pass
 
-    # ── Fallback：Playwright（處理需要瀏覽器渲染的情況）──────
+    # ── 快路：有 cookie 且未過期時才試 requests ──────────────
+    if cookie_str:
+        try:
+            r = requests.get(api_url, headers={
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+                "Cookie": cookie_str,
+                "Referer": search_url,
+                "x-api-source": "pc",
+            }, timeout=10)
+            d = r.json()
+            if d.get("error") != 90309999:
+                items = d.get("items", []) or []
+                prices = _parse_shopee_items(items)
+                if prices:
+                    return {
+                        "platform": "Shopee TW", "keyword": keyword,
+                        "price": sum(prices) // len(prices),
+                        "price_min": min(prices), "price_max": max(prices),
+                        "sample_count": len(prices),
+                        "currency": "TWD", "status": "ok", "url": search_url,
+                    }
+                return {"platform": "Shopee TW", "keyword": keyword, "price": None,
+                        "currency": "TWD", "status": "not_found", "url": search_url}
+        except Exception:
+            pass
+
+    # ── Playwright：不帶 cookie，讓 Shopee 自動發匿名 session ──
     from playwright.sync_api import sync_playwright
-
-    cookies = []
-    for part in cookie_str.split(";"):
-        part = part.strip()
-        if "=" in part:
-            name, _, value = part.partition("=")
-            cookies.append({"name": name.strip(), "value": value.strip(),
-                            "domain": ".shopee.tw", "path": "/"})
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
             ctx = browser.new_context(
                 user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
                 locale="zh-TW",
+                viewport={"width": 1280, "height": 800},
+                extra_http_headers={"Accept-Language": "zh-TW,zh;q=0.9"},
             )
-            ctx.add_cookies(cookies)
             page = ctx.new_page()
             with page.expect_response(
                 lambda r: "api/v4/search/search_items" in r.url and r.status == 200,
-                timeout=20000,
+                timeout=28000,
             ) as resp_info:
-                page.goto(search_url, wait_until="domcontentloaded", timeout=20000)
+                page.goto(search_url, wait_until="domcontentloaded", timeout=28000)
             api_json = resp_info.value.json()
             browser.close()
-
-        if (api_json or {}).get("error") == 90309999:
-            return {"platform": "Shopee TW", "keyword": keyword, "price": None,
-                    "currency": "TWD",
-                    "status": "cookie_expired (請至管理頁更新 Shopee Cookie)",
-                    "url": search_url}
 
         items = (api_json or {}).get("items", []) or []
         prices = _parse_shopee_items(items)
         if not prices:
             return {"platform": "Shopee TW", "keyword": keyword, "price": None,
                     "currency": "TWD", "status": "not_found", "url": search_url}
-
         return {
             "platform": "Shopee TW", "keyword": keyword,
             "price": sum(prices) // len(prices),
@@ -306,38 +290,72 @@ def scrape_yahoo_auctions(keyword: str) -> dict:
                 "currency": "TWD", "status": f"error: {e}", "url": search_url}
 
 
+_MOMO_HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
+    "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8",
+    "Accept-Encoding": "gzip, deflate, br",
+    "Connection": "keep-alive",
+    "Upgrade-Insecure-Requests": "1",
+    "Sec-Fetch-Dest": "document",
+    "Sec-Fetch-Mode": "navigate",
+    "Sec-Fetch-Site": "none",
+    "Sec-Fetch-User": "?1",
+    "Cache-Control": "max-age=0",
+}
+
+
 def scrape_momo(keyword: str) -> dict:
-    """搜尋 Momo 購物網，從 JSON-LD 結構化資料取價格與圖片（TWD）"""
+    """搜尋 Momo 購物網，從 JSON-LD 結構化資料取價格與圖片（TWD），失敗自動 retry"""
+    import time
     search_url = f"https://www.momoshop.com.tw/search/searchShop.jsp?keyword={quote(keyword)}&cateCode=&ent=k&disp=L&comdtyTyp=B&page=1"
-    try:
-        res = requests.get(search_url, headers=_BROWSER_HEADERS, timeout=15)
-        res.raise_for_status()
+    last_err = None
 
-        raw_prices = re.findall(r'"price":\s*"(\d+)"', res.text)
-        prices = [int(p) for p in raw_prices if 500 <= int(p) <= 50000]
-        imgs = re.findall(r'"image":\s*"(https://img\d+\.momoshop\.com\.tw[^"]+)"', res.text)
-        image_url = imgs[0] if imgs else None
+    for attempt in range(3):
+        if attempt > 0:
+            time.sleep(attempt * 2)
+        try:
+            sess = requests.Session()
+            sess.headers.update(_MOMO_HEADERS)
+            res = sess.get(search_url, timeout=15)
+            res.raise_for_status()
 
-        if not prices:
-            return {"platform": "Momo 購物", "keyword": keyword, "price": None,
-                    "currency": "TWD", "status": "not_found", "url": search_url}
+            # 確認是真正的搜尋結果頁（被 bot 擋住時 body 很短）
+            if len(res.text) < 5000:
+                last_err = "response too short, possible bot block"
+                continue
 
-        avg_price = sum(prices) // len(prices)
-        return {
-            "platform": "Momo 購物",
-            "keyword": keyword,
-            "price": avg_price,
-            "price_min": min(prices),
-            "price_max": max(prices),
-            "sample_count": len(prices),
-            "currency": "TWD",
-            "status": "ok",
-            "url": search_url,
-            "image_url": image_url,
-        }
-    except Exception as e:
-        return {"platform": "Momo 購物", "keyword": keyword, "price": None,
-                "currency": "TWD", "status": f"error: {e}", "url": search_url}
+            raw_prices = re.findall(r'"price":\s*"(\d+)"', res.text)
+            prices = [int(p) for p in raw_prices if 500 <= int(p) <= 80000]
+            imgs = re.findall(r'"image":\s*"(https://img\d+\.momoshop\.com\.tw[^"]+)"', res.text)
+            image_url = imgs[0] if imgs else None
+
+            if prices:
+                avg_price = sum(prices) // len(prices)
+                return {
+                    "platform": "Momo 購物",
+                    "keyword": keyword,
+                    "price": avg_price,
+                    "price_min": min(prices),
+                    "price_max": max(prices),
+                    "sample_count": len(prices),
+                    "currency": "TWD",
+                    "status": "ok",
+                    "url": search_url,
+                    "image_url": image_url,
+                }
+
+            # 頁面正常載入但無商品
+            if "momoshop" in res.text:
+                return {"platform": "Momo 購物", "keyword": keyword, "price": None,
+                        "currency": "TWD", "status": "not_found", "url": search_url}
+
+            last_err = "no prices found, unexpected page"
+        except Exception as e:
+            last_err = e
+
+    return {"platform": "Momo 購物", "keyword": keyword, "price": None,
+            "currency": "TWD", "status": f"error: {last_err}", "url": search_url}
 
 
 def scrape_adidas_tw(keyword: str) -> dict:
