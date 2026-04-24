@@ -32,6 +32,47 @@ def get_or_create_sneaker(name: str, sku: Optional[str]) -> int:
     return res.data[0]["id"]
 
 
+def get_existing_skus() -> set:
+    """回傳資料庫中已存在的所有 SKU（sneakers + pending_review）"""
+    sb = _get_client()
+    skus: set = set()
+
+    res = sb.table("sneakers").select("sku").execute()
+    for row in res.data or []:
+        if row.get("sku"):
+            skus.add(row["sku"].upper())
+
+    try:
+        res = sb.table("pending_review").select("sku").execute()
+        for row in res.data or []:
+            if row.get("sku"):
+                skus.add(row["sku"].upper())
+    except Exception:
+        pass
+
+    return skus
+
+
+def save_pending_review(items: list) -> int:
+    """將新發現的鞋款存入待審核清單，回傳寫入筆數"""
+    sb = _get_client()
+    rows = [
+        {
+            "sku":    item.get("sku"),
+            "name":   item.get("name", ""),
+            "source": item.get("source", ""),
+            "rank":   item.get("rank"),
+            "price":  item.get("price"),
+            "status": "pending",
+        }
+        for item in items
+        if item.get("sku") or item.get("name")
+    ]
+    if rows:
+        sb.table("pending_review").insert(rows).execute()
+    return len(rows)
+
+
 def save_prices(sneaker_id: int, platform_results: List[Dict]) -> None:
     sb = _get_client()
     rows = []

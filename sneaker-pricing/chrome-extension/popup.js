@@ -1,7 +1,7 @@
 const $ = id => document.getElementById(id);
 
 // 打包給朋友前，把這兩行填好即可——朋友裝完就能直接用
-const DEFAULT_BACKEND = '';  // 例：'https://cc-sneaker.railway.app'
+const DEFAULT_BACKEND = 'https://sneaker-pricing-production.up.railway.app';  // 例：'https://cc-sneaker.railway.app'
 const DEFAULT_TOKEN   = '400c67e13ef5cbc3b80b08c0cd2bdd24cc8ef75de53a547a';
 
 async function loadSettings() {

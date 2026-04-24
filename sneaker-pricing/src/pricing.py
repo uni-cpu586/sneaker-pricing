@@ -43,6 +43,12 @@ def _fetch_rates() -> Dict[str, float]:
     return _FALLBACK_RATES
 
 
+def get_rate(currency: str) -> float:
+    """取得指定貨幣 → TWD 匯率"""
+    rates = _fetch_rates()
+    return rates.get(currency.upper(), _FALLBACK_RATES.get(currency.upper(), 1.0))
+
+
 def calculate_price(
     cost: float,
     currency: str = "TWD",

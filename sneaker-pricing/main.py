@@ -2,7 +2,9 @@
 
 import argparse
 from src.search import search_product
-from src.scraper import scrape_abc_mart, scrape_nike, scrape_yahoo_auctions, scrape_pchome, scrape_shopee
+from src.scraper import (scrape_abc_mart, scrape_nike, scrape_yahoo_auctions,
+                         scrape_pchome, scrape_shopee,
+                         scrape_momo, scrape_adidas_tw, scrape_stockx)
 from src.pricing import calculate_price
 from src.db import get_or_create_sneaker, save_prices
 
@@ -21,6 +23,7 @@ def cmd_search(args):
 
     pchome_keyword = result.get("pchome_keyword")
     shopee_keyword = result.get("shopee_keyword")
+    name = result.get("name", "")
 
     platforms = []
     if abc_keyword:
@@ -31,8 +34,14 @@ def cmd_search(args):
         platforms.append(scrape_yahoo_auctions(yahoo_keyword))
     if pchome_keyword:
         platforms.append(scrape_pchome(pchome_keyword))
+    if pchome_keyword:
+        platforms.append(scrape_momo(pchome_keyword))
     if shopee_keyword:
         platforms.append(scrape_shopee(shopee_keyword))
+    if name.lower().startswith("adidas") and abc_keyword:
+        platforms.append(scrape_adidas_tw(abc_keyword))
+    if name:
+        platforms.append(scrape_stockx(name))
 
     for data in platforms:
         price = data.get("price")
@@ -100,6 +109,11 @@ def cmd_sync_all(_args=None):
             platforms.append(scrape_yahoo_auctions(entry["yahoo_keyword"]))
         if entry.get("pchome_keyword"):
             platforms.append(scrape_pchome(entry["pchome_keyword"]))
+        if entry.get("pchome_keyword"):
+            platforms.append(scrape_momo(entry["pchome_keyword"]))
+        if name.lower().startswith("adidas") and entry.get("abc_keyword"):
+            platforms.append(scrape_adidas_tw(entry["abc_keyword"]))
+        platforms.append(scrape_stockx(name))
 
         try:
             sneaker_id = get_or_create_sneaker(name, sku)
