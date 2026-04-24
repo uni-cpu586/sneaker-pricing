@@ -148,7 +148,7 @@ def _parse_shopee_items(items: list) -> list:
 
 
 def scrape_shopee(keyword: str) -> dict:
-    """搜尋蝦皮 TW；需要有效 cookie 才能查詢"""
+    """搜尋蝦皮 TW；優先用 cookie，失效則 fallback 訪客模式"""
     cookie_str = _load_shopee_cookie()
     search_url = f"https://shopee.tw/search?keyword={quote(keyword)}"
     api_url = (
@@ -156,22 +156,27 @@ def scrape_shopee(keyword: str) -> dict:
         f"?by=relevancy&keyword={quote(keyword)}&limit=20&newest=0&order=desc"
         f"&page_type=search&scenario=PAGE_GLOBAL_SEARCH&version=2"
     )
+    base_headers = {
+        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+        "Referer": search_url,
+        "x-api-source": "pc",
+        "Accept": "application/json",
+    }
 
-    if not cookie_str:
-        return {"platform": "Shopee TW", "keyword": keyword, "price": None,
-                "currency": "TWD", "status": "no_cookie", "url": search_url}
+    def _fetch(with_cookie: bool):
+        h = {**base_headers}
+        if with_cookie and cookie_str:
+            h["Cookie"] = cookie_str
+        return requests.get(api_url, headers=h, timeout=10).json()
 
     try:
-        r = requests.get(api_url, headers={
-            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
-            "Cookie": cookie_str,
-            "Referer": search_url,
-            "x-api-source": "pc",
-        }, timeout=10)
-        d = r.json()
-        if d.get("error") == 90309999:
+        d = _fetch(with_cookie=True)
+        # cookie 過期時 fallback 訪客模式
+        if d.get("error") == 90309999 and cookie_str:
+            d = _fetch(with_cookie=False)
+        if d.get("error"):
             return {"platform": "Shopee TW", "keyword": keyword, "price": None,
-                    "currency": "TWD", "status": "cookie_expired", "url": search_url}
+                    "currency": "TWD", "status": "error", "url": search_url}
         items = d.get("items", []) or []
         prices = _parse_shopee_items(items)
         if not prices:
