@@ -75,8 +75,11 @@ def _do_search(q: str) -> dict:
         tasks.append((scrape_pchome, pchome_kw))
         tasks.append((scrape_momo, pchome_kw))
     if shopee_kw: tasks.append((scrape_shopee, shopee_kw))
-    if name.lower().startswith("adidas") and abc_kw:
-        tasks.append((scrape_adidas_tw, abc_kw))
+    name_lc = name.lower()
+    # 動態條目（abc_kw 為 None）時，用 pchome_kw 當 Adidas TW 的關鍵字
+    adidas_kw = abc_kw or (pchome_kw if name_lc.startswith("adidas") else None)
+    if name_lc.startswith("adidas") and adidas_kw:
+        tasks.append((scrape_adidas_tw, adidas_kw))
     if name:      tasks.append((scrape_stockx, name))
 
     platform_results = []

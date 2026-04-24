@@ -1,8 +1,9 @@
 """智能搜尋引擎：支援中文暱稱、品牌名、部分比對、rapidfuzz 模糊搜尋"""
 from __future__ import annotations
 import json
+import re
 from pathlib import Path
-from typing import Dict, Optional
+from typing import Dict, List, Optional, Tuple
 
 CATALOG: Dict[str, Dict] = {
     # ── adidas ───────────────────────────────────────────────────────────────
@@ -120,9 +121,12 @@ _ALIASES: Dict[str, str] = {
     "nb 574": "574",
     "nb996":  "996",
     "nb 996": "996",
-    "nb2002": "2002R",
-    "nb9060": "9060",
-    "nb1906": "1906R",
+    "nb2002":  "2002R",
+    "nb 2002": "2002R",
+    "nb9060":  "9060",
+    "nb 9060": "9060",
+    "nb1906":  "1906R",
+    "nb 1906": "1906R",
     # ASICS
     "凱亞諾":       "gel-kayano 14",
     "gk14":         "gel-kayano 14",
@@ -187,6 +191,53 @@ _BRAND_CN: Dict[str, str] = {
     "勃肯鞋": "birkenstock",
 }
 
+# ── 品牌前綴（長的放前面，避免 "new balance" 被 "nb" 先截到）──────────────
+_BRAND_PREFIXES: List[Tuple[str, str]] = [
+    ("new balance", "new balance"),
+    ("adidas originals", "adidas"),
+    ("adidas yeezy",    "adidas"),
+    ("adidas",          "adidas"),
+    ("air jordan",      "nike"),
+    ("nike",            "nike"),
+    ("onitsuka tiger",  "onitsuka tiger"),
+    ("asics",           "asics"),
+    ("puma",            "puma"),
+    ("on running",      "on"),
+    ("birkenstock",     "birkenstock"),
+    ("crocs",           "crocs"),
+    ("ugg",             "ugg"),
+    ("fear of god",     "fog"),
+    # 縮寫
+    ("nb",              "new balance"),
+    ("aj",              "nike"),
+]
+
+_COLLAB_RE = re.compile(r'^(.+?)\s+x\s+(.+)$', re.IGNORECASE)
+
+
+def _extract_brand(q: str) -> Optional[str]:
+    """從查詢字串頭部提取品牌名（小寫標準化），找不到回傳 None"""
+    for prefix, brand in _BRAND_PREFIXES:
+        if q.startswith(prefix + " ") or q == prefix:
+            return brand
+    return None
+
+
+def _make_dynamic_entry(name: str) -> Dict:
+    """為 catalog 中沒有的鞋款（尤其是聯名）動態生成搜尋條目"""
+    # 去掉 "Originals"、"Running" 等冗詞，讓關鍵字更精準
+    kw = re.sub(r'\b(originals|running|athletics)\b', '', name, flags=re.IGNORECASE)
+    kw = re.sub(r'\s{2,}', ' ', kw).strip()
+    return {
+        "name": name,
+        "sku": None,
+        "abc_keyword": None,
+        "yahoo_keyword": kw,
+        "pchome_keyword": kw,
+        "shopee_keyword": kw,
+    }
+
+
 # ── 載入自動爬取的 catalog（不覆蓋手動條目）───────────────────────────────
 _AUTO_CATALOG_PATH = Path(__file__).parent / "catalog_auto.json"
 try:
@@ -229,8 +280,8 @@ def search_product(query: str) -> Optional[Dict]:
         if entry:
             return {"query": query, **entry}
 
-    # 3. SKU 格式（ASCII 字母 + 數字，如 DD1391-100；排除純中文+數字查詢）
-    if any(c.isascii() and c.isalpha() for c in q) and any(c.isdigit() for c in q):
+    # 3. SKU 格式（ASCII 字母 + 數字 + 無空格，如 DD1391-100）
+    if " " not in q and any(c.isascii() and c.isalpha() for c in q) and any(c.isdigit() for c in q):
         sku = q.upper()
         known = _SKU_INDEX.get(sku)
         if known:
@@ -252,21 +303,46 @@ def search_product(query: str) -> Optional[Dict]:
                     if not rest or rest in key.lower() or rest in entry["name"].lower():
                         return {"query": query, **entry}
 
-    # 6. rapidfuzz 模糊比對（最後手段，閾值 72）
+    # 6. rapidfuzz 模糊比對（品牌隔離 + 嚴格 scorer）
     try:
         from rapidfuzz import process, fuzz
-        result = process.extractOne(
-            q_lower, _CORPUS_STR,
-            scorer=fuzz.partial_ratio,
-            score_cutoff=72,
-        )
-        if result:
-            _, _, idx = result
-            matched_key = _CORPUS_KEY[idx]
-            entry = CATALOG.get(matched_key)
-            if entry:
-                return {"query": query, **entry}
+
+        brand = _extract_brand(q_lower)
+
+        if brand:
+            # 只在同品牌條目中搜尋，防止跨品牌誤配
+            pairs = [
+                (s, k) for s, k in zip(_CORPUS_STR, _CORPUS_KEY)
+                if brand in CATALOG.get(k, {}).get("name", "").lower()
+            ]
+        else:
+            pairs = list(zip(_CORPUS_STR, _CORPUS_KEY))
+
+        if pairs:
+            corp_str, corp_key = zip(*pairs)
+            result = process.extractOne(
+                q_lower, corp_str,
+                scorer=fuzz.token_sort_ratio,  # 對詞序不敏感，聯名款更準
+                score_cutoff=78,
+            )
+            if result:
+                _, score, idx = result
+                matched_key = corp_key[idx]
+                entry = CATALOG.get(matched_key)
+                if entry:
+                    # 額外保護：query 含 "x collab" 但命中條目沒有聯名，不採用
+                    has_collab_query = " x " in q_lower
+                    has_collab_entry = " x " in entry.get("name", "").lower()
+                    if has_collab_query and not has_collab_entry:
+                        pass  # 跳過，進入動態生成
+                    else:
+                        return {"query": query, **entry}
     except ImportError:
         pass
+
+    # 7. 動態條目：未知聯名款 / 沒有 catalog 條目的查詢
+    #    讓各平台用原始關鍵字自行搜尋，而不是回傳 None
+    if _extract_brand(q_lower) or _COLLAB_RE.match(q):
+        return {"query": query, **_make_dynamic_entry(query)}
 
     return None
