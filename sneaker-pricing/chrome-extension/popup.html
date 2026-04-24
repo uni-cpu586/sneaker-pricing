@@ -97,10 +97,10 @@ summary { font-size: 11px; color: var(--muted); cursor: pointer; user-select: no
 
 <div class="status-row">
   <div class="backend-status checking" id="backend-status">後端 Cookie 狀態：檢查中…</div>
-  <button class="refresh-btn" id="refresh-btn" onclick="refreshStatus()" title="重新檢查">↻</button>
+  <button class="refresh-btn" id="refresh-btn" title="重新檢查">↻</button>
 </div>
 
-<button class="btn" id="sync-btn" onclick="syncCookie()" disabled>同步蝦皮 Cookie</button>
+<button class="btn" id="sync-btn" disabled>同步蝦皮 Cookie</button>
 
 <div class="result" id="result"></div>
 <div id="last-synced"></div>
@@ -116,7 +116,7 @@ summary { font-size: 11px; color: var(--muted); cursor: pointer; user-select: no
       <label>Admin Token</label>
       <input type="password" id="admin-token" placeholder="貼上 ADMIN_TOKEN">
     </div>
-    <button class="btn" style="background:var(--card);color:var(--muted);border:1px solid var(--border);font-size:13px;font-weight:600;" onclick="saveSettings()">儲存設定</button>
+    <button class="btn" id="save-btn" style="background:var(--card);color:var(--muted);border:1px solid var(--border);font-size:13px;font-weight:600;">儲存設定</button>
   </div>
 </details>
 

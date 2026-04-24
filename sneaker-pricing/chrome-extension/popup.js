@@ -148,6 +148,10 @@ function showResult(msg, type) {
 }
 
 (async () => {
+  $('sync-btn').addEventListener('click', syncCookie);
+  $('refresh-btn').addEventListener('click', refreshStatus);
+  $('save-btn').addEventListener('click', saveSettings);
+
   const stored = await new Promise(resolve =>
     chrome.storage.local.get(['backendUrl', 'adminToken', 'lastSynced', 'autoSynced'], resolve)
   );
