@@ -396,6 +396,26 @@ body {
 .empty-state { text-align: center; padding: 48px 20px; color: var(--muted); }
 .empty-state .icon { font-size: 36px; margin-bottom: 12px; }
 .empty-state p { font-size: 14px; line-height: 1.6; }
+
+/* Suggest dropdown */
+.search-wrap { position: relative; margin-bottom: 14px; }
+.search-wrap .search-box { margin-bottom: 0; }
+.suggest-drop {
+  position: absolute; top: 100%; left: 0; right: 0;
+  background: var(--card); border: 1px solid rgba(245,197,24,.4);
+  border-top: none; border-radius: 0 0 10px 10px;
+  z-index: 50; overflow: hidden; display: none;
+}
+.suggest-drop.open { display: block; }
+.suggest-item {
+  padding: 11px 16px; cursor: pointer; transition: background 0.1s;
+  display: flex; justify-content: space-between; align-items: center;
+  border-bottom: 1px solid var(--border);
+}
+.suggest-item:last-child { border-bottom: none; }
+.suggest-item:hover, .suggest-item.active { background: rgba(245,197,24,.08); }
+.suggest-name { font-size: 14px; }
+.suggest-hint { font-size: 11px; color: var(--muted); }
 </style>
 </head>
 <body>
@@ -413,11 +433,14 @@ body {
 
 <!-- ── 查價 ── -->
 <div class="panel active" id="panel-search">
-  <div class="search-box">
-    <input type="text" id="search-input" placeholder="鞋款名稱、SKU、中文名…"
-           autocomplete="off" autocorrect="off" spellcheck="false"
-           onkeydown="if(event.key==='Enter')doSearch()">
-    <button onclick="doSearch()">查</button>
+  <div class="search-wrap">
+    <div class="search-box">
+      <input type="text" id="search-input" placeholder="鞋款名稱、SKU、中文名…"
+             autocomplete="off" autocorrect="off" spellcheck="false"
+             oninput="onSearchInput()" onkeydown="onSearchKeydown(event)">
+      <button onclick="doSearch()">查</button>
+    </div>
+    <div class="suggest-drop" id="suggest-drop"></div>
   </div>
 
   <div id="chips-area"></div>
@@ -587,6 +610,80 @@ const ICONS = {
 
 const QUICK = ['熊貓 Dunk','Samba','AJ1 倒鉤','Air Force 1','Yeezy 斑馬','NB 550','Speedcat','Kayano 14','NB 9060','Campus 00s'];
 
+// ── 搜尋建議 ──────────────────────────────────────────────
+let _suggestTimer, _suggestIdx = -1;
+
+function onSearchInput() {
+  _suggestIdx = -1;
+  clearTimeout(_suggestTimer);
+  const q = $('search-input').value.trim();
+  if (q.length < 2) { hideSuggest(); return; }
+  _suggestTimer = setTimeout(() => fetchSuggest(q), 280);
+}
+
+async function fetchSuggest(q) {
+  try {
+    const r = await fetch('/api/suggest?q=' + encodeURIComponent(q));
+    renderSuggest(await r.json());
+  } catch { hideSuggest(); }
+}
+
+function renderSuggest(items) {
+  const drop = $('suggest-drop');
+  if (!items || !items.length) { hideSuggest(); return; }
+  drop.innerHTML = items.map(it =>
+    `<div class="suggest-item" data-name="${it.name.replace(/"/g,'&quot;')}"
+         onclick="pickSuggest(this.dataset.name)">
+      <span class="suggest-name">${it.name}</span>
+      ${it.hint ? `<span class="suggest-hint">${it.hint}</span>` : ''}
+    </div>`
+  ).join('');
+  drop.classList.add('open');
+}
+
+function hideSuggest() {
+  const drop = $('suggest-drop');
+  drop.classList.remove('open');
+  drop.innerHTML = '';
+  _suggestIdx = -1;
+}
+
+function pickSuggest(name) {
+  $('search-input').value = name;
+  hideSuggest();
+  doSearch();
+}
+
+function onSearchKeydown(e) {
+  const drop = $('suggest-drop');
+  const items = drop.querySelectorAll('.suggest-item');
+  if (drop.classList.contains('open') && items.length) {
+    if (e.key === 'ArrowDown') {
+      e.preventDefault();
+      _suggestIdx = Math.min(_suggestIdx + 1, items.length - 1);
+      items.forEach((el, i) => el.classList.toggle('active', i === _suggestIdx));
+      return;
+    }
+    if (e.key === 'ArrowUp') {
+      e.preventDefault();
+      _suggestIdx = Math.max(_suggestIdx - 1, -1);
+      items.forEach((el, i) => el.classList.toggle('active', i === _suggestIdx));
+      return;
+    }
+    if (e.key === 'Enter' && _suggestIdx >= 0) {
+      e.preventDefault();
+      pickSuggest(items[_suggestIdx].dataset.name);
+      return;
+    }
+    if (e.key === 'Escape') { hideSuggest(); return; }
+  }
+  if (e.key === 'Enter') doSearch();
+}
+
+document.addEventListener('click', e => {
+  if (!e.target.closest('.search-wrap')) hideSuggest();
+});
+
 // ── 搜尋歷史 ─────────────────────────────────────────────
 const HIST_KEY = 'sneaker_history';
 function getHistory() { try { return JSON.parse(localStorage.getItem(HIST_KEY) || '[]'); } catch { return []; } }
@@ -630,6 +727,7 @@ async function doSearch() {
   const q = $('search-input').value.trim();
   if (!q) return;
   _lastQuery = q;
+  hideSuggest();
 
   $('search-error').classList.remove('show');
   $('search-result').classList.remove('show');

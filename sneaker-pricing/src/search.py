@@ -104,8 +104,11 @@ _ALIASES: Dict[str, str] = {
     "aj4":          "AJ4",
     "air jordan 4": "AJ4",
     "熊貓dunk":     "熊貓dunk",
+    "熊貓 dunk":    "熊貓dunk",
     "panda dunk":   "熊貓dunk",
     "dunk panda":   "熊貓dunk",
+    "nike panda":   "熊貓dunk",
+    "nike dunk panda": "熊貓dunk",
     "air force":    "空軍",
     "air force 1":  "空軍",
     "af1":          "空軍",
@@ -213,6 +216,16 @@ _BRAND_PREFIXES: List[Tuple[str, str]] = [
 ]
 
 _COLLAB_RE = re.compile(r'^(.+?)\s+x\s+(.+)$', re.IGNORECASE)
+
+
+def _extract_anchors(q: str) -> List[str]:
+    """提取 Anchor Token：品牌 + 數字型號，命中條目的名稱必須同時包含所有 anchor"""
+    anchors: List[str] = []
+    brand = _extract_brand(q)
+    if brand:
+        anchors.append(brand)
+    anchors.extend(re.findall(r'\b\d{2,}\b', q))
+    return anchors
 
 
 def _extract_brand(q: str) -> Optional[str]:
@@ -336,7 +349,10 @@ def search_product(query: str) -> Optional[Dict]:
                     if has_collab_query and not has_collab_entry:
                         pass  # 跳過，進入動態生成
                     else:
-                        return {"query": query, **entry}
+                        # Anchor token 驗證：品牌 + 數字型號必須出現在結果名稱中
+                        anchors = _extract_anchors(q_lower)
+                        if all(a in entry.get("name", "").lower() for a in anchors):
+                            return {"query": query, "confidence": score, **entry}
     except ImportError:
         pass
 

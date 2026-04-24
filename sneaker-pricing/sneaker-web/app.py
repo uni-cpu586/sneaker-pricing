@@ -60,6 +60,7 @@ def _do_search(q: str) -> dict:
     if not entry:
         return {"error": f"找不到「{q}」"}
 
+    confidence = entry.get("confidence")
     sku       = entry.get("sku")
     name      = entry.get("name", "")
     abc_kw    = entry.get("abc_keyword")
@@ -134,12 +135,13 @@ def _do_search(q: str) -> dict:
             }
 
     return {
-        "name":      name,
-        "sku":       sku,
-        "is_collab": _is_collab(name),
-        "image_url": image_url,
-        "platforms": platforms,
-        "arbitrage": arbitrage,
+        "name":       name,
+        "sku":        sku,
+        "confidence": confidence,
+        "is_collab":  _is_collab(name),
+        "image_url":  image_url,
+        "platforms":  platforms,
+        "arbitrage":  arbitrage,
     }
 
 
@@ -170,6 +172,31 @@ async def api_profit(
         cost=cost, currency=currency, shipping=shipping,
         commission_rate=commission, margin_rate=margin,
     ))
+
+
+@app.get("/api/suggest")
+async def api_suggest(q: str = ""):
+    from src.search import CATALOG, _ALIASES
+    qs = q.strip().lower()
+    if len(qs) < 2:
+        return JSONResponse([])
+    seen, out = set(), []
+    for key, entry in CATALOG.items():
+        nm = entry.get("name", "")
+        if qs in nm.lower() and key not in seen:
+            out.append({"name": nm, "hint": ""})
+            seen.add(key)
+    for key, entry in CATALOG.items():
+        if qs in key.lower() and key not in seen:
+            out.append({"name": entry.get("name", ""), "hint": key})
+            seen.add(key)
+    for alias, target in _ALIASES.items():
+        if qs in alias.lower() and target not in seen:
+            e = CATALOG.get(target, {})
+            if e:
+                out.append({"name": e.get("name", target), "hint": alias})
+                seen.add(target)
+    return JSONResponse(out[:7])
 
 
 @app.get("/api/trending")
