@@ -1,9 +1,9 @@
 FROM python:3.11-slim
 
 WORKDIR /app
-COPY requirements.txt .
+COPY sneaker-pricing/requirements.txt .
 RUN pip install --no-cache-dir -r requirements.txt
 
-COPY . .
+COPY sneaker-pricing/ .
 
 CMD ["/bin/bash", "-c", "cd sneaker-web && uvicorn app:app --host 0.0.0.0 --port ${PORT:-8000}"]
