@@ -186,17 +186,21 @@ body {
 }
 
 /* 配色選單 chips */
-.colorway-row { padding: 4px 0 8px; }
-.colorway-select {
-  width: 100%; padding: 7px 32px 7px 10px;
-  background: var(--card); color: var(--fg);
-  border: 1px solid var(--border); border-radius: 8px;
-  font-size: 13px; cursor: pointer;
-  appearance: none; -webkit-appearance: none;
-  background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='8' viewBox='0 0 12 8'%3E%3Cpath d='M1 1l5 5 5-5' stroke='%23888' stroke-width='1.5' fill='none' stroke-linecap='round'/%3E%3C/svg%3E");
-  background-repeat: no-repeat; background-position: right 10px center;
+.colorway-row {
+  display: flex; gap: 5px; overflow-x: auto;
+  padding: 4px 0 8px; scrollbar-width: none;
 }
-.colorway-select:focus { outline: none; border-color: var(--accent); }
+.colorway-row::-webkit-scrollbar { display: none; }
+.colorway-chip {
+  padding: 3px 10px; border-radius: 20px;
+  border: 1px solid var(--border);
+  background: none; color: var(--muted);
+  font-size: 11px; font-weight: 600; white-space: nowrap;
+  cursor: pointer; flex-shrink: 0;
+  transition: all 0.15s;
+}
+.colorway-chip:active,
+.colorway-chip:hover { border-color: var(--accent); color: var(--accent); }
 
 /* 平台行情（右欄緊湊列） */
 .platforms-card { background: none; border: none; overflow: visible; margin-bottom: 0; }
@@ -771,19 +775,12 @@ function renderResult(data) {
   const colorwayRow = $('colorway-row');
   const sibs = data.siblings || [];
   if (sibs.length > 0) {
-    const sel = document.createElement('select');
-    sel.className = 'colorway-select';
-    const ph = document.createElement('option');
-    ph.value = ''; ph.textContent = '其他配色 ▾'; ph.disabled = true; ph.selected = true;
-    sel.appendChild(ph);
-    sibs.forEach(s => {
-      const opt = document.createElement('option');
-      opt.value = s.key; opt.textContent = s.label;
-      sel.appendChild(opt);
-    });
-    sel.addEventListener('change', () => { if (sel.value) quickSearch(sel.value); });
-    colorwayRow.innerHTML = '';
-    colorwayRow.appendChild(sel);
+    colorwayRow.innerHTML = sibs.map(s =>
+      `<button class="colorway-chip" data-key="${s.key.replace(/&/g,'&amp;').replace(/"/g,'&quot;')}">${s.label}</button>`
+    ).join('');
+    colorwayRow.querySelectorAll('.colorway-chip').forEach(btn =>
+      btn.addEventListener('click', () => quickSearch(btn.dataset.key))
+    );
     colorwayRow.style.display = '';
   } else {
     colorwayRow.style.display = 'none';
