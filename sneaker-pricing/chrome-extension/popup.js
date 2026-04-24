@@ -1,15 +1,15 @@
 const $ = id => document.getElementById(id);
 
-// 打包給朋友前，把這兩行填好即可——朋友裝完就能直接用
-const DEFAULT_BACKEND = 'https://sneaker-pricing-production.up.railway.app';  // 例：'https://cc-sneaker.railway.app'
+const DEFAULT_BACKEND = 'https://sneaker-pricing-production.up.railway.app';
 const DEFAULT_TOKEN   = '400c67e13ef5cbc3b80b08c0cd2bdd24cc8ef75de53a547a';
 
 async function loadSettings() {
   return new Promise(resolve => {
-    chrome.storage.local.get(['backendUrl', 'adminToken'], stored => {
+    chrome.storage.local.get(['backendUrl', 'adminToken', 'lastSynced'], stored => {
       resolve({
         backendUrl:  stored.backendUrl  || DEFAULT_BACKEND,
         adminToken:  stored.adminToken  || DEFAULT_TOKEN,
+        lastSynced:  stored.lastSynced  || null,
       });
     });
   });
@@ -17,7 +17,7 @@ async function loadSettings() {
 
 async function checkLogin() {
   const cookies = await chrome.cookies.getAll({ domain: 'shopee.tw' });
-  const uid = cookies.find(c => c.name === 'SPC_U');
+  const uid  = cookies.find(c => c.name === 'SPC_U');
   const dot  = $('status-dot');
   const text = $('status-text');
   const btn  = $('sync-btn');
@@ -30,6 +30,37 @@ async function checkLogin() {
     dot.className    = 'dot red';
     text.textContent = '尚未登入蝦皮，請先到蝦皮登入';
     btn.disabled     = true;
+  }
+}
+
+async function checkBackendCookie() {
+  const { backendUrl, adminToken } = await loadSettings();
+  const el = $('backend-status');
+  el.textContent = '檢查中…';
+  el.className   = 'backend-status checking';
+
+  try {
+    const res  = await fetch(`${backendUrl.replace(/\/$/, '')}/admin/cookie-status`, {
+      headers: { 'X-Admin-Token': adminToken },
+    });
+    const data = await res.json();
+    if (res.ok) {
+      const preview = data.preview || '';
+      const len     = data.length  || 0;
+      if (len > 200) {
+        el.textContent = `✅ 後端 cookie 有效（${len} 字元）`;
+        el.className   = 'backend-status ok';
+      } else {
+        el.textContent = `⚠️ 後端 cookie 過短（${len} 字元），可能已失效`;
+        el.className   = 'backend-status warn';
+      }
+    } else {
+      el.textContent = `❌ 查詢失敗：${data.detail || res.status}`;
+      el.className   = 'backend-status err';
+    }
+  } catch (e) {
+    el.textContent = `❌ 無法連線後端`;
+    el.className   = 'backend-status err';
   }
 }
 
@@ -55,29 +86,40 @@ async function syncCookie() {
       headers: {
         'Content-Type':  'application/json',
         'X-Admin-Token': adminToken,
-        'X-Timestamp':   Date.now().toString(),
       },
       body: JSON.stringify({ cookie: cookieStr }),
     });
 
     const data = await res.json();
     if (res.ok) {
+      const now = new Date().toLocaleString('zh-TW', { hour12: false });
+      await chrome.storage.local.set({ lastSynced: now });
+      updateLastSynced(now);
+
       btn.textContent = '✅ 已同步';
       btn.style.background = 'var(--green)';
       showResult(`同步成功！Cookie 長度：${data.length} 字元`, 'ok');
+      checkBackendCookie();
       setTimeout(() => {
-        btn.textContent = '同步蝦皮 Cookie';
+        btn.textContent      = '同步蝦皮 Cookie';
         btn.style.background = '';
+        btn.disabled         = false;
       }, 3000);
     } else {
       showResult('❌ ' + (data.detail || '同步失敗'), 'err');
+      btn.disabled = false;
     }
   } catch (e) {
     showResult('❌ 網路錯誤：' + e.message, 'err');
-  } finally {
     btn.disabled = false;
+  } finally {
     if (!btn.textContent.includes('✅')) btn.textContent = '同步蝦皮 Cookie';
   }
+}
+
+function updateLastSynced(ts) {
+  const el = $('last-synced');
+  if (el) el.textContent = ts ? `上次同步：${ts}` : '';
 }
 
 async function saveSettings() {
@@ -85,6 +127,7 @@ async function saveSettings() {
   const adminToken = $('admin-token').value.trim();
   await chrome.storage.local.set({ backendUrl, adminToken });
   showResult('✅ 設定已儲存', 'ok');
+  checkBackendCookie();
 }
 
 function showResult(msg, type) {
@@ -93,11 +136,12 @@ function showResult(msg, type) {
   el.className   = 'result show ' + type;
 }
 
-// 初始化
 (async () => {
-  const { backendUrl, adminToken } = await loadSettings();
+  const { backendUrl, adminToken, lastSynced } = await loadSettings();
   $('backend-url').value = backendUrl;
   $('admin-token').value = adminToken;
   if (!backendUrl) $('settings-panel').open = true;
+  updateLastSynced(lastSynced);
   await checkLogin();
+  await checkBackendCookie();
 })();

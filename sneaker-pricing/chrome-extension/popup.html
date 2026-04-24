@@ -57,6 +57,17 @@ input:focus { border-color: var(--accent); }
 .result.err { background: rgba(239,68,68,.1); border: 1px solid rgba(239,68,68,.3); color: var(--red); }
 .result.show { display: block; }
 
+.backend-status {
+  font-size: 11px; padding: 6px 10px; border-radius: 6px;
+  margin-bottom: 10px; border: 1px solid var(--border);
+}
+.backend-status.ok      { color: var(--green); border-color: rgba(34,197,94,.3); background: rgba(34,197,94,.07); }
+.backend-status.warn    { color: var(--accent); border-color: rgba(245,197,24,.3); background: rgba(245,197,24,.07); }
+.backend-status.err     { color: var(--red);   border-color: rgba(239,68,68,.3);  background: rgba(239,68,68,.07); }
+.backend-status.checking{ color: var(--muted); }
+
+#last-synced { font-size: 10px; color: var(--muted); text-align: center; margin-top: 6px; }
+
 details { margin-top: 12px; }
 summary { font-size: 11px; color: var(--muted); cursor: pointer; user-select: none; }
 .settings-body { margin-top: 10px; display: flex; flex-direction: column; gap: 10px; }
@@ -72,16 +83,19 @@ summary { font-size: 11px; color: var(--muted); cursor: pointer; user-select: no
   <span id="status-text">檢查登入狀態中…</span>
 </div>
 
+<div class="backend-status checking" id="backend-status">後端 Cookie 狀態：檢查中…</div>
+
 <button class="btn" id="sync-btn" onclick="syncCookie()" disabled>同步蝦皮 Cookie</button>
 
 <div class="result" id="result"></div>
+<div id="last-synced"></div>
 
 <details id="settings-panel">
   <summary>⚙️ 設定後端 URL 與 Token</summary>
   <div class="settings-body">
     <div class="section">
-      <label>後端 URL（每次重啟 tunnel 後需更新）</label>
-      <input type="text" id="backend-url" placeholder="https://xxxx.trycloudflare.com">
+      <label>後端 URL（預設已填入 Railway 網址）</label>
+      <input type="text" id="backend-url" placeholder="https://sneaker-pricing-production.up.railway.app">
     </div>
     <div class="section">
       <label>Admin Token</label>
