@@ -10,7 +10,7 @@ CATALOG: Dict[str, Dict] = {
     "熊貓":          {"sku": "DV0831-101", "abc_keyword": "adidas FORUM",    "yahoo_keyword": "DV0831-101",               "pchome_keyword": "adidas Forum Low Panda DV0831",      "shopee_keyword": "adidas Forum Low Panda DV0831",      "name": "adidas Forum Low Panda"},
     "stan smith":    {"sku": None,         "abc_keyword": "STAN SMITH",      "yahoo_keyword": "adidas Stan Smith",        "pchome_keyword": "adidas Stan Smith",                  "shopee_keyword": "adidas Stan Smith",                  "name": "adidas Stan Smith"},
     "斑馬":          {"sku": None,         "abc_keyword": None,              "yahoo_keyword": "Yeezy 350 Zebra",          "pchome_keyword": "Yeezy 350 V2 Zebra CP9654",          "shopee_keyword": "Yeezy 350 V2 Zebra",                 "name": "adidas Yeezy Boost 350 V2 Zebra"},
-    "samba":         {"sku": "B75806",     "abc_keyword": "SAMBA OG",        "yahoo_keyword": "adidas Samba OG B75806",   "pchome_keyword": "adidas Samba OG",                    "shopee_keyword": "adidas Samba OG",                    "name": "adidas Samba OG"},
+    "samba":         {"sku": "B75806",     "abc_keyword": "SAMBA OG",        "yahoo_keyword": "adidas Samba OG B75806",   "pchome_keyword": "adidas Samba OG",                    "shopee_keyword": "adidas Samba OG",                    "name": "adidas Samba OG",              "image_url": "https://assets.adidas.com/images/h_840,f_auto,q_auto,fl_lossy/3bbecbdf584e40398446a8bf0117cf62_9366/Samba_OG_Shoes_White_B75806_01_00_standard.jpg"},
     "campus":        {"sku": None,         "abc_keyword": "CAMPUS 00S",      "yahoo_keyword": "adidas Campus 00s",        "pchome_keyword": "adidas Campus 00s",                  "shopee_keyword": "adidas Campus 00s",                  "name": "adidas Campus 00s"},
     "gazelle":       {"sku": None,         "abc_keyword": "GAZELLE",         "yahoo_keyword": "adidas Gazelle",           "pchome_keyword": "adidas Gazelle",                     "shopee_keyword": "adidas Gazelle",                     "name": "adidas Gazelle"},
     # ── Nike Dunk ────────────────────────────────────────────────────────────
@@ -96,11 +96,14 @@ _SKU_INDEX: Dict[str, Dict] = {v["sku"]: v for v in CATALOG.values() if v["sku"]
 _ALIASES: Dict[str, str] = {
     # adidas
     "椰子":         "斑馬",
+    "yeezy 斑馬":   "斑馬",
+    "yeezy zebra":  "斑馬",
     "森巴":         "samba",
     "森巴鞋":       "samba",
     # Nike
     "喬一":         "倒鉤",
     "aj1":          "倒鉤",
+    "aj1 倒鉤":     "倒鉤",
     "aj4":          "AJ4",
     "air jordan 4": "AJ4",
     "熊貓dunk":     "熊貓dunk",

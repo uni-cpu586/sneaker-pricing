@@ -94,8 +94,8 @@ def _do_search(q: str) -> dict:
 
     _IMG_PRIO = {"Nike TW": 0, "Adidas TW": 1, "StockX": 2, "Momo 購物": 3}
     platforms, official_prices, market_prices = [], [], []
-    image_url = None
-    _image_prio = 999
+    image_url = entry.get("image_url")  # catalog 指定的圖優先
+    _image_prio = -1 if image_url else 999
     for r in platform_results:
         price   = r.get("price")
         pname   = r.get("platform", "")
