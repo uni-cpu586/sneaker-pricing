@@ -246,9 +246,30 @@ _FAMILY_GROUPS: Dict[str, List[tuple]] = {
         ("samba",           "OG"),
         ("bad bunny samba", "Bad Bunny"),
     ],
-    "nb550": [
-        ("550",     "基本款"),
-        ("ald 550", "ALD"),
+    "nb": [
+        ("530",      "530"),
+        ("550",      "550"),
+        ("574",      "574"),
+        ("996",      "996"),
+        ("2002R",    "2002R"),
+        ("9060",     "9060"),
+        ("1906R",    "1906R"),
+        ("ald 550",  "550 ALD"),
+        ("ald 990v6","990v6 ALD"),
+    ],
+    "birkenstock": [
+        ("birkenstock boston",      "Boston"),
+        ("birkenstock arizona",     "Arizona"),
+        ("birkenstock boston soft", "Boston 軟底"),
+    ],
+    "crocs": [
+        ("crocs classic",   "Classic"),
+        ("crocs salehe",    "Salehe"),
+        ("crocs bad bunny", "Bad Bunny"),
+    ],
+    "ugg": [
+        ("ugg tazz",      "Tazz"),
+        ("ugg ultra mini", "Ultra Mini"),
     ],
 }
 
