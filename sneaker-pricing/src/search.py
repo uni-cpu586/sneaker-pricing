@@ -220,6 +220,57 @@ _BRAND_PREFIXES: List[Tuple[str, str]] = [
 
 _COLLAB_RE = re.compile(r'^(.+?)\s+x\s+(.+)$', re.IGNORECASE)
 
+# ── 配色家族分組 ──────────────────────────────────────────────────────────────
+_FAMILY_GROUPS: Dict[str, List[tuple]] = {
+    "dunk": [
+        ("芝加哥",            "芝加哥"),
+        ("陰陽",              "陰陽"),
+        ("奧利奧",            "奧利奧"),
+        ("閃電",              "閃電"),
+        ("熊貓dunk",          "熊貓"),
+        ("a ma maniere dunk", "A Ma"),
+        ("off white dunk",    "Off-White"),
+    ],
+    "aj1": [
+        ("倒鉤",                      "倒鉤"),
+        ("大學藍",                    "大學藍"),
+        ("黑腳趾",                    "黑腳趾"),
+        ("travis scott aj1",          "Travis"),
+        ("travis scott aj1 fragment", "Fragment"),
+    ],
+    "aj4": [
+        ("AJ4",              "基本款"),
+        ("travis scott aj4", "Travis"),
+    ],
+    "samba": [
+        ("samba",           "OG"),
+        ("bad bunny samba", "Bad Bunny"),
+    ],
+    "nb550": [
+        ("550",     "基本款"),
+        ("ald 550", "ALD"),
+    ],
+}
+
+_KEY_TO_FAMILY: Dict[str, Tuple[str, str]] = {
+    key: (family, label)
+    for family, members in _FAMILY_GROUPS.items()
+    for key, label in members
+}
+
+
+def get_siblings(catalog_key: Optional[str]) -> List[Dict]:
+    """回傳同家族的其他配色（不含自身），沒有家族則回傳空列表"""
+    if not catalog_key or catalog_key not in _KEY_TO_FAMILY:
+        return []
+    family, _ = _KEY_TO_FAMILY[catalog_key]
+    result = []
+    for key, label in _FAMILY_GROUPS[family]:
+        entry = CATALOG.get(key)
+        if entry and key != catalog_key:
+            result.append({"key": key, "name": entry["name"], "label": label})
+    return result
+
 
 def _extract_anchors(q: str) -> List[str]:
     """提取 Anchor Token：品牌 + 數字型號，命中條目的名稱必須同時包含所有 anchor"""
@@ -285,30 +336,32 @@ def search_product(query: str) -> Optional[Dict]:
     q_lower = q.lower()
 
     # 1. 直接比對 catalog key
-    entry = CATALOG.get(q) or CATALOG.get(q_lower)
+    _k1 = q if q in CATALOG else (q_lower if q_lower in CATALOG else None)
+    entry = CATALOG.get(_k1) if _k1 else None
     if entry:
-        return {"query": query, **entry}
+        return {"query": query, "_key": _k1, **entry}
 
     # 2. 中文別名查詢
     alias_key = _ALIASES.get(q_lower)
     if alias_key:
         entry = CATALOG.get(alias_key)
         if entry:
-            return {"query": query, **entry}
+            return {"query": query, "_key": alias_key, **entry}
 
     # 3. SKU 格式（ASCII 字母 + 數字 + 無空格，如 DD1391-100）
     if " " not in q and any(c.isascii() and c.isalpha() for c in q) and any(c.isdigit() for c in q):
         sku = q.upper()
         known = _SKU_INDEX.get(sku)
         if known:
-            return {"query": query, **known}
-        return {"query": query, "sku": sku, "abc_keyword": None,
+            _sku_k = next((k for k, v in CATALOG.items() if v is known), None)
+            return {"query": query, "_key": _sku_k, **known}
+        return {"query": query, "_key": None, "sku": sku, "abc_keyword": None,
                 "yahoo_keyword": sku, "name": sku}
 
     # 4. 子字串比對（catalog key 或商品名稱包含查詢詞）
     for key, entry in CATALOG.items():
         if q_lower in key.lower() or q_lower in entry["name"].lower():
-            return {"query": query, **entry}
+            return {"query": query, "_key": key, **entry}
 
     # 5. 中文品牌名 + 關鍵字
     for cn_brand, en_brand in _BRAND_CN.items():
@@ -317,7 +370,7 @@ def search_product(query: str) -> Optional[Dict]:
             for key, entry in CATALOG.items():
                 if en_brand in entry["name"].lower():
                     if not rest or rest in key.lower() or rest in entry["name"].lower():
-                        return {"query": query, **entry}
+                        return {"query": query, "_key": key, **entry}
 
     # 6. rapidfuzz 模糊比對（品牌隔離 + 嚴格 scorer）
     try:
@@ -355,13 +408,13 @@ def search_product(query: str) -> Optional[Dict]:
                         # Anchor token 驗證：品牌 + 數字型號必須出現在結果名稱中
                         anchors = _extract_anchors(q_lower)
                         if all(a in entry.get("name", "").lower() for a in anchors):
-                            return {"query": query, "confidence": score, **entry}
+                            return {"query": query, "_key": matched_key, "confidence": score, **entry}
     except ImportError:
         pass
 
     # 7. 動態條目：未知聯名款 / 沒有 catalog 條目的查詢
     #    讓各平台用原始關鍵字自行搜尋，而不是回傳 None
     if _extract_brand(q_lower) or _COLLAB_RE.match(q):
-        return {"query": query, **_make_dynamic_entry(query)}
+        return {"query": query, "_key": None, **_make_dynamic_entry(query)}
 
     return None

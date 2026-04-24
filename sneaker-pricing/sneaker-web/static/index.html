@@ -169,21 +169,38 @@ body {
   background: linear-gradient(135deg, rgba(245,197,24,.08), rgba(245,197,24,.03));
   border: 1px solid rgba(245,197,24,.25);
   border-radius: var(--radius);
-  padding: 16px;
+  padding: 10px 12px;
   margin-bottom: 16px;
 }
-.arb-title { font-size: 12px; font-weight: 700; color: var(--accent); margin-bottom: 12px; letter-spacing: 0.5px; text-transform: uppercase; }
-.arb-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px; }
-.arb-label { color: var(--muted); font-size: 13px; }
-.arb-val { font-weight: 700; font-size: 15px; }
-.arb-divider { border: none; border-top: 1px solid rgba(245,197,24,.2); margin: 10px 0; }
+.arb-title { font-size: 11px; font-weight: 700; color: var(--accent); margin-bottom: 6px; letter-spacing: 0.5px; text-transform: uppercase; }
+.arb-row { display: flex; justify-content: space-between; align-items: center; margin-bottom: 4px; }
+.arb-label { color: var(--muted); font-size: 12px; }
+.arb-val { font-weight: 700; font-size: 13px; }
+.arb-divider { border: none; border-top: 1px solid rgba(245,197,24,.2); margin: 6px 0; }
 .arb-profit-row { display: flex; justify-content: space-between; align-items: center; }
-.arb-profit-num { font-size: 24px; font-weight: 900; color: var(--green); }
+.arb-profit-num { font-size: 18px; font-weight: 900; color: var(--green); }
 .arb-profit-pct {
-  font-size: 13px; color: var(--green);
+  font-size: 11px; color: var(--green);
   background: rgba(34,197,94,.1);
-  padding: 5px 12px; border-radius: 20px; font-weight: 700;
+  padding: 3px 9px; border-radius: 20px; font-weight: 700;
 }
+
+/* 配色選單 chips */
+.colorway-row {
+  display: flex; gap: 5px; overflow-x: auto;
+  padding: 4px 0 8px; scrollbar-width: none;
+}
+.colorway-row::-webkit-scrollbar { display: none; }
+.colorway-chip {
+  padding: 3px 10px; border-radius: 20px;
+  border: 1px solid var(--border);
+  background: none; color: var(--muted);
+  font-size: 11px; font-weight: 600; white-space: nowrap;
+  cursor: pointer; flex-shrink: 0;
+  transition: all 0.15s;
+}
+.colorway-chip:active,
+.colorway-chip:hover { border-color: var(--accent); color: var(--accent); }
 
 /* 平台行情（右欄緊湊列） */
 .platforms-card { background: none; border: none; overflow: visible; margin-bottom: 0; }
@@ -454,6 +471,7 @@ body {
           <span class="badge badge-collab" id="collab-badge" style="display:none">聯名款</span>
         </div>
         <div class="result-sku" id="result-sku"></div>
+        <div class="colorway-row" id="colorway-row" style="display:none"></div>
         <div class="platforms-card" id="platforms-card">
           <div id="platforms-list"></div>
           <div class="toggle-row" id="toggle-row" style="display:none">
@@ -751,6 +769,18 @@ function renderResult(data) {
       onerror="this.parentNode.innerHTML='<div class=result-img-placeholder>👟</div>'">`;
   } else {
     wrap.innerHTML = `<div class="result-img-placeholder">👟</div>`;
+  }
+
+  // 配色 chips
+  const colorwayRow = $('colorway-row');
+  const sibs = data.siblings || [];
+  if (sibs.length > 0) {
+    colorwayRow.innerHTML = sibs.map(s =>
+      `<button class="colorway-chip" onclick="quickSearch(${JSON.stringify(s.key)})">${s.label}</button>`
+    ).join('');
+    colorwayRow.style.display = '';
+  } else {
+    colorwayRow.style.display = 'none';
   }
 
   // 套利卡

@@ -49,7 +49,7 @@ def _is_collab(name: str) -> bool:
 
 
 def _do_search(q: str) -> dict:
-    from src.search import search_product
+    from src.search import search_product, get_siblings
     from src.scraper import (
         scrape_abc_mart, scrape_nike, scrape_yahoo_auctions,
         scrape_pchome, scrape_shopee, scrape_momo,
@@ -134,6 +134,9 @@ def _do_search(q: str) -> dict:
                 "margin_pct": round(profit / buy * 100, 1),
             }
 
+    catalog_key = entry.get("_key")
+    siblings    = get_siblings(catalog_key)
+
     return {
         "name":       name,
         "sku":        sku,
@@ -142,6 +145,7 @@ def _do_search(q: str) -> dict:
         "image_url":  image_url,
         "platforms":  platforms,
         "arbitrage":  arbitrage,
+        "siblings":   siblings,
     }
 
 
