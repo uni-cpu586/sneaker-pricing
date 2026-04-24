@@ -225,6 +225,46 @@ body {
 .p-range { font-size: 11px; color: var(--muted); text-align: right; margin-top: 2px; }
 .official-dot { display: inline-block; width: 6px; height: 6px; background: var(--green); border-radius: 50%; margin-left: 5px; vertical-align: middle; }
 
+/* Toggle no-data rows */
+.no-data-row { display: none; }
+.platforms-card.show-all .no-data-row { display: flex; }
+.toggle-row {
+  padding: 12px 16px;
+  border-top: 1px solid var(--border);
+  text-align: center;
+}
+.toggle-btn {
+  background: none; border: none;
+  color: var(--muted); font-size: 12px; cursor: pointer;
+  padding: 4px 8px; border-radius: 6px;
+  transition: color 0.15s;
+}
+.toggle-btn:hover { color: var(--text); }
+
+/* Query time & share */
+.result-actions {
+  display: flex; justify-content: space-between; align-items: center;
+  margin-bottom: 12px;
+}
+.query-time { font-size: 11px; color: var(--muted); }
+.share-btn {
+  background: none; border: 1px solid var(--border);
+  color: var(--muted); font-size: 12px; cursor: pointer;
+  padding: 5px 12px; border-radius: 20px;
+  transition: all 0.15s;
+}
+.share-btn:active { border-color: var(--accent); color: var(--accent); }
+
+/* Toast */
+.toast {
+  position: fixed; bottom: 24px; left: 50%; transform: translateX(-50%) translateY(20px);
+  background: var(--card); border: 1px solid var(--border);
+  color: var(--text); font-size: 13px; padding: 10px 20px;
+  border-radius: 20px; opacity: 0; transition: all 0.25s;
+  pointer-events: none; white-space: nowrap; z-index: 100;
+}
+.toast.show { opacity: 1; transform: translateX(-50%) translateY(0); }
+
 /* Error */
 .error-msg {
   background: rgba(239,68,68,.08);
@@ -390,7 +430,13 @@ body {
   </div>
 
   <div class="result" id="search-result">
-    <div class="cached-tag" id="cached-tag" style="display:none">⚡ 快取結果（10 分鐘內）</div>
+    <div class="result-actions">
+      <div>
+        <div class="cached-tag" id="cached-tag" style="display:none">⚡ 快取結果（10 分鐘內）</div>
+        <div class="query-time" id="query-time"></div>
+      </div>
+      <button class="share-btn" onclick="shareResult()">🔗 分享</button>
+    </div>
 
     <div class="result-hero">
       <div id="result-img-wrap">
@@ -427,9 +473,12 @@ body {
     </div>
 
     <!-- 平台行情 -->
-    <div class="platforms-card">
+    <div class="platforms-card" id="platforms-card">
       <div class="platforms-title">各平台行情（TWD）</div>
       <div id="platforms-list"></div>
+      <div class="toggle-row" id="toggle-row" style="display:none">
+        <button class="toggle-btn" id="toggle-btn" onclick="toggleNoData()">顯示查無資料的平台 ▾</button>
+      </div>
     </div>
   </div>
 </div>
@@ -519,6 +568,8 @@ body {
   </div>
 </div>
 
+<div class="toast" id="toast"></div>
+
 <script>
 const $ = id => document.getElementById(id);
 const fmt = n => n != null ? 'NT$' + Math.round(n).toLocaleString() : '—';
@@ -573,9 +624,12 @@ function quickSearch(q) {
   doSearch();
 }
 
+let _lastQuery = '';
+
 async function doSearch() {
   const q = $('search-input').value.trim();
   if (!q) return;
+  _lastQuery = q;
 
   $('search-error').classList.remove('show');
   $('search-result').classList.remove('show');
@@ -610,6 +664,7 @@ function renderResult(data) {
   $('result-sku').textContent  = data.sku ? 'SKU: ' + data.sku : '';
   $('collab-badge').style.display = data.is_collab ? '' : 'none';
   $('cached-tag').style.display   = data.cached ? '' : 'none';
+  $('query-time').textContent = '查詢於 ' + new Date().toLocaleTimeString('zh-TW', {hour:'2-digit',minute:'2-digit'});
 
   // 鞋款圖片
   const wrap = $('result-img-wrap');
@@ -634,15 +689,21 @@ function renderResult(data) {
 
   // 平台列表
   const list = $('platforms-list');
+  const card = $('platforms-card');
   list.innerHTML = '';
+  card.classList.remove('show-all');
+  let hiddenCount = 0;
+
   for (const p of data.platforms) {
     const hasPrice = p.price != null;
     const icon     = ICONS[p.platform] || '💻';
     const isOff    = p.is_official;
     const typeLabel = isOff ? '官方零售' : '二手 / 市場';
+    const isNoData = !hasPrice && !p.url;
 
     const row = document.createElement(p.url ? 'a' : 'div');
-    row.className = 'platform-row';
+    row.className = 'platform-row' + (isNoData ? ' no-data-row' : '');
+    if (isNoData) hiddenCount++;
     if (p.url) { row.href = p.url; row.target = '_blank'; row.rel = 'noopener'; }
 
     let priceHtml;
@@ -668,7 +729,54 @@ function renderResult(data) {
     list.appendChild(row);
   }
 
+  const toggleRow = $('toggle-row');
+  const toggleBtn = $('toggle-btn');
+  if (hiddenCount > 0) {
+    toggleRow.style.display = '';
+    toggleBtn.textContent = `顯示查無資料的 ${hiddenCount} 個平台 ▾`;
+  } else {
+    toggleRow.style.display = 'none';
+  }
+
   $('search-result').classList.add('show');
+}
+
+let _showAll = false;
+function toggleNoData() {
+  _showAll = !_showAll;
+  const card = $('platforms-card');
+  const btn  = $('toggle-btn');
+  if (_showAll) {
+    card.classList.add('show-all');
+    btn.textContent = '收起 ▴';
+  } else {
+    card.classList.remove('show-all');
+    const hidden = card.querySelectorAll('.no-data-row').length;
+    btn.textContent = `顯示查無資料的 ${hidden} 個平台 ▾`;
+  }
+}
+
+function shareResult() {
+  const url = location.origin + location.pathname + '?q=' + encodeURIComponent(_lastQuery);
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(url).then(() => showToast('連結已複製 ✓'));
+  } else {
+    const el = document.createElement('input');
+    el.value = url;
+    document.body.appendChild(el);
+    el.select();
+    document.execCommand('copy');
+    document.body.removeChild(el);
+    showToast('連結已複製 ✓');
+  }
+  history.replaceState(null, '', '?q=' + encodeURIComponent(_lastQuery));
+}
+
+function showToast(msg) {
+  const t = $('toast');
+  t.textContent = msg;
+  t.classList.add('show');
+  setTimeout(() => t.classList.remove('show'), 2000);
 }
 
 // ── 利潤試算 ──────────────────────────────────────────────
@@ -706,8 +814,12 @@ async function calcProfit() {
   }
 }
 
-// ── 熱銷榜 ──────────────────────────────────────────────
+// ── 啟動 ─────────────────────────────────────────────────
 renderChips();
+(function initFromURL() {
+  const q = new URLSearchParams(location.search).get('q');
+  if (q) { $('search-input').value = q; doSearch(); }
+})();
 
 let _trendLoaded = false;
 

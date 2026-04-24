@@ -88,8 +88,10 @@ def _do_search(q: str) -> dict:
             except Exception:
                 pass
 
+    _IMG_PRIO = {"Nike TW": 0, "Adidas TW": 1, "StockX": 2, "Momo 購物": 3}
     platforms, official_prices, market_prices = [], [], []
     image_url = None
+    _image_prio = 999
     for r in platform_results:
         price   = r.get("price")
         pname   = r.get("platform", "")
@@ -107,10 +109,11 @@ def _do_search(q: str) -> dict:
         })
         if price:
             (official_prices if is_off else market_prices).append(price)
-        # Nike 圖優先，其次 StockX
         if r.get("image_url"):
-            if pname == "Nike TW" or image_url is None:
+            prio = _IMG_PRIO.get(pname, 4)
+            if prio < _image_prio:
                 image_url = r["image_url"]
+                _image_prio = prio
 
     platforms.sort(key=lambda x: (x["price"] is None, x["price"] or 0))
 

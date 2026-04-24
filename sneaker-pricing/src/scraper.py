@@ -133,19 +133,61 @@ def _load_shopee_cookie() -> str:
     return os.getenv("SHOPEE_COOKIE", "").strip()
 
 
-def scrape_shopee(keyword: str) -> dict:
-    """搜尋蝦皮 TW，用 Playwright headless browser"""
-    from urllib.parse import quote
-    from playwright.sync_api import sync_playwright
+def _parse_shopee_items(items: list) -> list:
+    prices = []
+    for item in items:
+        info = item.get("item_basic") or item
+        price_raw = info.get("price") or info.get("price_min")
+        if price_raw:
+            val = int(price_raw)
+            # Shopee 台灣以 1/100000 TWD 儲存價格
+            twd = val // 100000
+            if twd > 0:
+                prices.append(twd)
+    return prices
 
+
+def scrape_shopee(keyword: str) -> dict:
+    """搜尋蝦皮 TW；先試 requests 快路，再 fallback Playwright"""
     cookie_str = _load_shopee_cookie()
     search_url = f"https://shopee.tw/search?keyword={quote(keyword)}"
     if not cookie_str:
         return {"platform": "Shopee TW", "keyword": keyword, "price": None,
-                "currency": "TWD", "status": "no_cookie",
-                "url": search_url}
+                "currency": "TWD", "status": "no_cookie", "url": search_url}
 
-    # 把 cookie string 解析成 list of dicts
+    # ── 快路：直接 requests ──────────────────────────────────
+    api_url = (
+        f"https://shopee.tw/api/v4/search/search_items"
+        f"?by=relevancy&keyword={quote(keyword)}&limit=20&newest=0&order=desc"
+        f"&page_type=search&scenario=PAGE_GLOBAL_SEARCH&version=2"
+    )
+    try:
+        r = requests.get(api_url, headers={
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+            "Cookie": cookie_str,
+            "Referer": search_url,
+            "x-api-source": "pc",
+        }, timeout=10)
+        d = r.json()
+        if d.get("error") != 90309999:
+            items = d.get("items", []) or []
+            prices = _parse_shopee_items(items)
+            if prices:
+                return {
+                    "platform": "Shopee TW", "keyword": keyword,
+                    "price": sum(prices) // len(prices),
+                    "price_min": min(prices), "price_max": max(prices),
+                    "sample_count": len(prices),
+                    "currency": "TWD", "status": "ok", "url": search_url,
+                }
+            return {"platform": "Shopee TW", "keyword": keyword, "price": None,
+                    "currency": "TWD", "status": "not_found", "url": search_url}
+    except Exception:
+        pass
+
+    # ── Fallback：Playwright（處理需要瀏覽器渲染的情況）──────
+    from playwright.sync_api import sync_playwright
+
     cookies = []
     for part in cookie_str.split(";"):
         part = part.strip()
@@ -153,7 +195,6 @@ def scrape_shopee(keyword: str) -> dict:
             name, _, value = part.partition("=")
             cookies.append({"name": name.strip(), "value": value.strip(),
                             "domain": ".shopee.tw", "path": "/"})
-
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
@@ -163,46 +204,32 @@ def scrape_shopee(keyword: str) -> dict:
             )
             ctx.add_cookies(cookies)
             page = ctx.new_page()
-
             with page.expect_response(
                 lambda r: "api/v4/search/search_items" in r.url and r.status == 200,
                 timeout=20000,
             ) as resp_info:
                 page.goto(search_url, wait_until="domcontentloaded", timeout=20000)
-
             api_json = resp_info.value.json()
             browser.close()
 
-        # 90309999 = 未登入 or cookie 過期
         if (api_json or {}).get("error") == 90309999:
             return {"platform": "Shopee TW", "keyword": keyword, "price": None,
                     "currency": "TWD",
-                    "status": "cookie_expired (重新從瀏覽器 DevTools 複製最新 SHOPEE_COOKIE)",
+                    "status": "cookie_expired (請至管理頁更新 Shopee Cookie)",
                     "url": search_url}
 
         items = (api_json or {}).get("items", []) or []
-        prices = []
-        for item in items:
-            info = item.get("item_basic") or item
-            price_raw = info.get("price") or info.get("price_min")
-            if price_raw:
-                prices.append(int(price_raw) // 100000)
-
+        prices = _parse_shopee_items(items)
         if not prices:
             return {"platform": "Shopee TW", "keyword": keyword, "price": None,
                     "currency": "TWD", "status": "not_found", "url": search_url}
 
-        avg_price = sum(prices) // len(prices)
         return {
-            "platform": "Shopee TW",
-            "keyword": keyword,
-            "price": avg_price,
-            "price_min": min(prices),
-            "price_max": max(prices),
+            "platform": "Shopee TW", "keyword": keyword,
+            "price": sum(prices) // len(prices),
+            "price_min": min(prices), "price_max": max(prices),
             "sample_count": len(prices),
-            "currency": "TWD",
-            "status": "ok",
-            "url": search_url,
+            "currency": "TWD", "status": "ok", "url": search_url,
         }
     except Exception as e:
         return {"platform": "Shopee TW", "keyword": keyword, "price": None,
@@ -280,22 +307,16 @@ def scrape_yahoo_auctions(keyword: str) -> dict:
 
 
 def scrape_momo(keyword: str) -> dict:
-    """搜尋 Momo 購物網，回傳平均售價（TWD）"""
+    """搜尋 Momo 購物網，從 JSON-LD 結構化資料取價格與圖片（TWD）"""
     search_url = f"https://www.momoshop.com.tw/search/searchShop.jsp?keyword={quote(keyword)}&cateCode=&ent=k&disp=L&comdtyTyp=B&page=1"
     try:
         res = requests.get(search_url, headers=_BROWSER_HEADERS, timeout=15)
         res.raise_for_status()
-        soup = BeautifulSoup(res.text, "html.parser")
 
-        prices = []
-        for item in soup.select("li.goodsLi"):
-            for sel in (".priceInfo .price b", ".price b", "b.price", ".priceArea .price b"):
-                price_el = item.select_one(sel)
-                if price_el:
-                    digits = re.sub(r"[^\d]", "", price_el.get_text())
-                    if digits and int(digits) > 100:
-                        prices.append(int(digits))
-                    break
+        raw_prices = re.findall(r'"price":\s*"(\d+)"', res.text)
+        prices = [int(p) for p in raw_prices if 500 <= int(p) <= 50000]
+        imgs = re.findall(r'"image":\s*"(https://img\d+\.momoshop\.com\.tw[^"]+)"', res.text)
+        image_url = imgs[0] if imgs else None
 
         if not prices:
             return {"platform": "Momo 購物", "keyword": keyword, "price": None,
@@ -312,6 +333,7 @@ def scrape_momo(keyword: str) -> dict:
             "currency": "TWD",
             "status": "ok",
             "url": search_url,
+            "image_url": image_url,
         }
     except Exception as e:
         return {"platform": "Momo 購物", "keyword": keyword, "price": None,
@@ -319,17 +341,25 @@ def scrape_momo(keyword: str) -> dict:
 
 
 def scrape_adidas_tw(keyword: str) -> dict:
-    """搜尋 Adidas 台灣官網（91APP，JS 渲染），用 Playwright 取價格"""
+    """搜尋 Adidas 台灣官網（91APP，JS 渲染），用 Playwright 取價格與圖片"""
     from playwright.sync_api import sync_playwright
     search_url = f"https://www.adidas.com.tw/search?q={quote(keyword)}"
+    captured_images: list[str] = []
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
             page = browser.new_page(
                 user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
             )
+
+            def _on_response(response):
+                url = response.url
+                ct = response.headers.get("content-type", "")
+                if "image" in ct and "91app.com" in url and "SalePage" in url:
+                    captured_images.append(url)
+
+            page.on("response", _on_response)
             page.goto(search_url, wait_until="domcontentloaded", timeout=25000)
-            # 等待價格 element 出現
             try:
                 page.wait_for_function(
                     "document.body.innerText.includes('NT$')", timeout=12000
@@ -344,12 +374,14 @@ def scrape_adidas_tw(keyword: str) -> dict:
             val = int(m.group(1).replace(",", ""))
             if 500 < val < 50000:
                 prices.append(val)
+        prices = list(dict.fromkeys(prices))
 
-        prices = list(dict.fromkeys(prices))  # deduplicate, preserve order
+        image_url = captured_images[0] if captured_images else None
 
         if not prices:
             return {"platform": "Adidas TW", "keyword": keyword, "price": None,
-                    "currency": "TWD", "status": "not_found", "url": search_url}
+                    "currency": "TWD", "status": "not_found", "url": search_url,
+                    "image_url": image_url}
 
         avg_price = sum(prices) // len(prices)
         return {
@@ -362,6 +394,7 @@ def scrape_adidas_tw(keyword: str) -> dict:
             "currency": "TWD",
             "status": "ok",
             "url": search_url,
+            "image_url": image_url,
         }
     except Exception as e:
         return {"platform": "Adidas TW", "keyword": keyword, "price": None,
