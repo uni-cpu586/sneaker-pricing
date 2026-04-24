@@ -776,8 +776,11 @@ function renderResult(data) {
   const sibs = data.siblings || [];
   if (sibs.length > 0) {
     colorwayRow.innerHTML = sibs.map(s =>
-      `<button class="colorway-chip" onclick="quickSearch(${JSON.stringify(s.key)})">${s.label}</button>`
+      `<button class="colorway-chip" data-key="${s.key.replace(/&/g,'&amp;').replace(/"/g,'&quot;')}">${s.label}</button>`
     ).join('');
+    colorwayRow.querySelectorAll('.colorway-chip').forEach(btn =>
+      btn.addEventListener('click', () => quickSearch(btn.dataset.key))
+    );
     colorwayRow.style.display = '';
   } else {
     colorwayRow.style.display = 'none';
