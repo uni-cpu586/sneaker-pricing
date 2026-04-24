@@ -12,9 +12,16 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from fastapi import FastAPI, Header, HTTPException
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse, JSONResponse
+from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 app = FastAPI(title="C&C 球鞋比價")
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_methods=["GET", "POST"],
+    allow_headers=["*"],
+)
 
 _OFFICIAL_PLATFORMS = {"ABC-MART JP", "Nike TW", "Adidas TW"}
 _COLLAB_KEYWORDS = [
