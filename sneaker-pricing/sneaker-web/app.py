@@ -89,6 +89,7 @@ def _do_search(q: str) -> dict:
                 pass
 
     platforms, official_prices, market_prices = [], [], []
+    image_url = None
     for r in platform_results:
         price   = r.get("price")
         pname   = r.get("platform", "")
@@ -106,6 +107,10 @@ def _do_search(q: str) -> dict:
         })
         if price:
             (official_prices if is_off else market_prices).append(price)
+        # Nike 圖優先，其次 StockX
+        if r.get("image_url"):
+            if pname == "Nike TW" or image_url is None:
+                image_url = r["image_url"]
 
     platforms.sort(key=lambda x: (x["price"] is None, x["price"] or 0))
 
@@ -126,6 +131,7 @@ def _do_search(q: str) -> dict:
         "name":      name,
         "sku":       sku,
         "is_collab": _is_collab(name),
+        "image_url": image_url,
         "platforms": platforms,
         "arbitrage": arbitrage,
     }

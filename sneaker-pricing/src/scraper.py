@@ -95,10 +95,14 @@ def scrape_nike(sku: str) -> dict:
             return {"platform": "Nike TW", "sku": sku, "price": None, "currency": "TWD",
                     "status": "not_found", "url": f"https://www.nike.com/tw/"}
 
-        pi = objects[0].get("productInfo", [{}])[0]
+        obj = objects[0]
+        pi = obj.get("productInfo", [{}])[0]
         merch_price = pi.get("merchPrice", {})
-        name = pi.get("productContent", {}).get("title", sku)
+        content = pi.get("productContent", {})
+        name = content.get("title", sku)
         price = merch_price.get("currentPrice")
+        card = (obj.get("publishedContent") or {}).get("properties", {}).get("productCard", {}).get("properties", {})
+        image_url = card.get("squarishURL") or card.get("portraitURL") or None
         return {
             "platform": "Nike TW",
             "sku": sku,
@@ -108,6 +112,7 @@ def scrape_nike(sku: str) -> dict:
             "discounted": merch_price.get("discounted", False),
             "status": "ok",
             "url": f"https://www.nike.com/tw/t/-/{sku}",
+            "image_url": image_url,
         }
     except Exception as e:
         return {"platform": "Nike TW", "sku": sku, "price": None, "currency": "TWD",
@@ -379,6 +384,7 @@ def scrape_stockx(keyword: str) -> dict:
         )
         if res.status_code == 200:
             hits = res.json().get("hits", [])
+            image_url = (hits[0].get("media") or {}).get("imageUrl") if hits else None
             prices_usd = [
                 h["market"]["lowestAsk"]
                 for h in hits
@@ -397,6 +403,7 @@ def scrape_stockx(keyword: str) -> dict:
                     "currency": "TWD",
                     "status": "ok",
                     "url": search_url,
+                    "image_url": image_url,
                 }
     except Exception:
         pass
