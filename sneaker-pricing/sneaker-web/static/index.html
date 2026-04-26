@@ -277,6 +277,8 @@ body {
 .p-price-r.no-data { color: var(--accent); font-size: 11px; font-weight: 600; }
 .p-price-r.no-url { color: var(--muted); font-size: 11px; font-weight: 400; }
 .p-range-r { font-size: 10px; color: var(--muted); text-align: right; }
+.p-range-bar { height: 3px; background: var(--border); border-radius: 2px; position: relative; margin-top: 4px; }
+.p-range-dot { position: absolute; top: 50%; transform: translate(-50%,-50%); width: 7px; height: 7px; background: var(--accent); border-radius: 50%; }
 .official-dot { display: inline-block; width: 5px; height: 5px; background: var(--green); border-radius: 50%; margin-left: 4px; vertical-align: middle; }
 
 /* Query time & share */
@@ -888,7 +890,12 @@ function renderResult(data) {
       priceHtml = `<div style="text-align:right">
         <div class="p-price-r${isOff ? ' official' : ''}">${fmt(p.price)}${dot}${lowestTag}</div>`;
       if (p.sample_count > 1) {
-        priceHtml += `<div class="p-range-r">起 ${Math.round(p.price_min).toLocaleString()} · 最高 ${Math.round(p.price_max).toLocaleString()}</div>`;
+        const pMin = Math.round(p.price_min), pMax = Math.round(p.price_max);
+        priceHtml += `<div class="p-range-r">起 ${pMin.toLocaleString()} · 最高 ${pMax.toLocaleString()}</div>`;
+        if (p.price_max > p.price_min) {
+          const pct = Math.round((p.price - p.price_min) / (p.price_max - p.price_min) * 100);
+          priceHtml += `<div class="p-range-bar"><div class="p-range-dot" style="left:${pct}%"></div></div>`;
+        }
       }
       priceHtml += `</div>`;
     } else if (p.url) {

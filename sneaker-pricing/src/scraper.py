@@ -37,6 +37,9 @@ def _h(base: dict) -> dict:
     return {**base, "User-Agent": _rua()}
 
 
+_UA_DESKTOP = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
+_UA_MOBILE  = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Mobile/15E148 Safari/604.1"
+
 _NIKE_BASE = {
     "Nike-Api-Caller-Id": "com.nike.commerce.nikedotcom.web",
 }
@@ -175,11 +178,12 @@ def scrape_shopee(keyword: str) -> dict:
         f"?by=relevancy&keyword={quote(keyword)}&limit=20&newest=0&order=desc"
         f"&page_type=search&scenario=PAGE_GLOBAL_SEARCH&version=2"
     )
-    base_headers = _h({
+    base_headers = {
+        "User-Agent": _UA_MOBILE,
         "Referer": search_url,
         "x-api-source": "pc",
         "Accept": "application/json",
-    })
+    }
 
     def _fetch(with_cookie: bool):
         h = {**base_headers}
@@ -216,7 +220,7 @@ def scrape_pchome(keyword: str) -> dict:
     """搜尋 PChome 24h，回傳平均售價（TWD）"""
     search_url = f"https://ecshweb.pchome.com.tw/search/v3.3/all/results?q={keyword}&page=1&sort=rnk/dc"
     try:
-        res = requests.get(search_url, headers=_h(_ABC_BASE), timeout=10)
+        res = requests.get(search_url, headers={**_ABC_BASE, "User-Agent": _UA_DESKTOP}, timeout=10)
         res.raise_for_status()
         prods = res.json().get("prods", []) or []
 
@@ -307,7 +311,7 @@ def scrape_momo(keyword: str) -> dict:
             time.sleep(attempt * 2)
         try:
             sess = requests.Session()
-            sess.headers.update(_h(_MOMO_BASE))
+            sess.headers.update({**_MOMO_BASE, "User-Agent": _UA_DESKTOP})
             res = sess.get(search_url, timeout=15)
             res.raise_for_status()
 

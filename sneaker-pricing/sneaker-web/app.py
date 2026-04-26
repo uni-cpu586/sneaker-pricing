@@ -16,8 +16,23 @@ from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
 _HOT_QUERIES = [
+    # 10 原始熱門
     "熊貓 Dunk", "Samba", "AJ1 倒鉤", "Air Force 1",
     "Yeezy 斑馬", "NB 550", "Speedcat", "Kayano 14", "NB 9060", "Campus 00s",
+    # Dunk 配色
+    "芝加哥", "陰陽",
+    # Samba 配色
+    "samba black", "samba wales bonner", "bad bunny samba",
+    # AJ1 配色
+    "大學藍", "黑腳趾", "lost and found",
+    # AF1 配色
+    "af1 triple black",
+    # Yeezy 配色
+    "yeezy cream", "yeezy beluga",
+    # NB 聯名
+    "ald 550",
+    # AJ4 + Dunk High
+    "AJ4", "dunk high panda",
 ]
 
 
