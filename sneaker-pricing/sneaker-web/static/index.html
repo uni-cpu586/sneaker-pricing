@@ -113,19 +113,60 @@ body {
 .chip.history { border-color: rgba(245,197,24,.3); color: var(--accent); background: rgba(245,197,24,.06); }
 .chip:active { border-color: var(--accent); color: var(--accent); }
 
-/* Loading */
-.loading { text-align: center; padding: 48px 0; display: none; }
-.loading.show { display: block; }
-.spinner {
-  width: 36px; height: 36px;
-  border: 3px solid var(--border);
-  border-top-color: var(--accent);
-  border-radius: 50%;
-  animation: spin 0.8s linear infinite;
-  margin: 0 auto 14px;
+/* Skeleton Screen */
+.skeleton-screen { display: none; padding: 4px 0 16px; }
+.skeleton-screen.show { display: block; }
+.skel-layout {
+  display: flex; gap: 14px; align-items: flex-start;
+  background: var(--card); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 14px; margin-bottom: 16px;
 }
-@keyframes spin { to { transform: rotate(360deg); } }
-.loading p { color: var(--muted); font-size: 13px; }
+.skel-pulse {
+  background: linear-gradient(90deg, var(--border) 25%, #1e1e1e 50%, var(--border) 75%);
+  background-size: 200% 100%;
+  animation: skel-shimmer 1.5s ease-in-out infinite;
+  border-radius: 6px;
+}
+@keyframes skel-shimmer {
+  0%   { background-position: 200% 0; }
+  100% { background-position: -200% 0; }
+}
+.skel-img  { width: 120px; height: 120px; border-radius: 10px; flex-shrink: 0; }
+.skel-right { flex: 1; padding-top: 2px; }
+.skel-line { height: 12px; border-radius: 6px; margin-bottom: 9px; }
+.skel-line.h16 { height: 16px; }
+.skel-line.w100 { width: 100%; }
+.skel-line.w75  { width: 75%;  }
+.skel-line.w50  { width: 50%;  }
+.skel-line.w35  { width: 35%;  }
+.skel-label { font-size: 11px; color: var(--muted); text-align: center; margin-top: 6px; }
+
+/* Lowest badge */
+.lowest-badge {
+  display: inline-flex; align-items: center;
+  padding: 2px 7px; border-radius: 20px;
+  background: rgba(34,197,94,.12); color: var(--green);
+  border: 1px solid rgba(34,197,94,.3);
+  font-size: 9px; font-weight: 800;
+  white-space: nowrap; margin-left: 6px; vertical-align: middle;
+}
+
+/* SKU copy button */
+.sku-copy-btn {
+  background: none; border: 1px solid var(--border);
+  color: var(--muted); font-size: 10px; cursor: pointer;
+  padding: 1px 8px; border-radius: 4px; margin-left: 6px;
+  transition: all 0.15s; vertical-align: middle;
+}
+.sku-copy-btn:active { border-color: var(--accent); color: var(--accent); }
+
+/* Clear history button */
+.hist-clear-btn {
+  background: none; border: none;
+  color: var(--muted); font-size: 11px; cursor: pointer;
+  padding: 0; transition: color 0.15s; float: right;
+}
+.hist-clear-btn:hover { color: var(--red); }
 
 /* Result */
 .result { display: none; }
@@ -444,9 +485,19 @@ body {
 
   <div class="error-msg" id="search-error"></div>
 
-  <div class="loading" id="search-loading">
-    <div class="spinner"></div>
-    <p>正在查詢各平台，約需 15–20 秒…</p>
+  <div class="skeleton-screen" id="search-loading">
+    <div class="skel-layout">
+      <div class="skel-pulse skel-img"></div>
+      <div class="skel-right">
+        <div class="skel-pulse skel-line h16 w75"></div>
+        <div class="skel-pulse skel-line w35"></div>
+        <div class="skel-pulse skel-line w100" style="margin-top:12px"></div>
+        <div class="skel-pulse skel-line w100"></div>
+        <div class="skel-pulse skel-line w100"></div>
+        <div class="skel-pulse skel-line w75"></div>
+      </div>
+    </div>
+    <p class="skel-label">正在查詢各平台，約需 15–20 秒…</p>
   </div>
 
   <div class="result" id="search-result">
@@ -694,14 +745,20 @@ function renderChips() {
   const area = $('chips-area');
   let html = '';
   if (hist.length) {
-    html += `<div class="chips-label">最近查詢</div><div class="chips">` +
-      hist.map(q => `<span class="chip history" onclick="quickSearch('${q.replace(/'/g,"\\'")}')">🕐 ${q}</span>`).join('') +
+    html += `<div class="chips-label">最近查詢<button class="hist-clear-btn" onclick="clearHistory()">清除</button></div>` +
+      `<div class="chips">` +
+      hist.slice(0, 5).map(q => `<span class="chip history" onclick="quickSearch('${q.replace(/'/g,"\\'")}')">🕐 ${q}</span>`).join('') +
       `</div>`;
   }
   html += `<div class="chips-label">熱門鞋款</div><div class="chips">` +
     QUICK.map(q => `<span class="chip" onclick="quickSearch('${q.replace(/'/g,"\\'")}')"> ${q}</span>`).join('') +
     `</div>`;
   area.innerHTML = html;
+}
+
+function clearHistory() {
+  localStorage.removeItem(HIST_KEY);
+  renderChips();
 }
 
 // ── 分頁切換 ──────────────────────────────────────────────
@@ -757,7 +814,10 @@ async function doSearch() {
 
 function renderResult(data) {
   $('result-name').textContent = data.name;
-  $('result-sku').textContent  = data.sku ? 'SKU: ' + data.sku : '';
+  const sku = data.sku;
+  $('result-sku').innerHTML = sku
+    ? `SKU: <span>${sku}</span><button class="sku-copy-btn" onclick="copySKU('${sku}')">複製</button>`
+    : '';
   $('collab-badge').style.display = data.is_collab ? '' : 'none';
   $('cached-tag').style.display   = data.cached ? '' : 'none';
   $('query-time').textContent = '查詢於 ' + new Date().toLocaleTimeString('zh-TW', {hour:'2-digit',minute:'2-digit'});
@@ -805,6 +865,10 @@ function renderResult(data) {
   card.classList.remove('show-all');
   let hiddenCount = 0;
 
+  // 找最低價平台
+  const pricedPlats = data.platforms.filter(p => p.price != null);
+  const lowestPrice = pricedPlats.length > 1 ? Math.min(...pricedPlats.map(p => p.price)) : null;
+
   for (const p of data.platforms) {
     const hasPrice = p.price != null;
     const icon     = ICONS[p.platform] || '💻';
@@ -818,11 +882,15 @@ function renderResult(data) {
 
     let priceHtml;
     if (hasPrice) {
-      const dot = isOff ? '<span class="official-dot"></span>' : '';
-      priceHtml = `<div class="p-price-r${isOff ? ' official' : ''}">${fmt(p.price)}${dot}</div>`;
+      const dot      = isOff ? '<span class="official-dot"></span>' : '';
+      const isLowest = lowestPrice != null && p.price === lowestPrice;
+      const lowestTag = isLowest ? '<span class="lowest-badge">🔥 最低</span>' : '';
+      priceHtml = `<div style="text-align:right">
+        <div class="p-price-r${isOff ? ' official' : ''}">${fmt(p.price)}${dot}${lowestTag}</div>`;
       if (p.sample_count > 1) {
-        priceHtml += `<div class="p-range-r">${Math.round(p.price_min).toLocaleString()}~${Math.round(p.price_max).toLocaleString()}</div>`;
+        priceHtml += `<div class="p-range-r">起 ${Math.round(p.price_min).toLocaleString()} · 最高 ${Math.round(p.price_max).toLocaleString()}</div>`;
       }
+      priceHtml += `</div>`;
     } else if (p.url) {
       priceHtml = `<div class="p-price-r no-data">查看 →</div>`;
     } else {
@@ -832,7 +900,7 @@ function renderResult(data) {
     row.innerHTML = `
       <div class="p-icon-r">${icon}</div>
       <div class="p-name-r">${p.platform}</div>
-      <div>${priceHtml}</div>`;
+      ${priceHtml}`;
     list.appendChild(row);
   }
 
@@ -860,6 +928,17 @@ function toggleNoData() {
     card.classList.remove('show-all');
     const hidden = card.querySelectorAll('.no-data-row').length;
     btn.textContent = `顯示 ${hidden} 個查無資料平台 ▾`;
+  }
+}
+
+function copySKU(sku) {
+  if (navigator.clipboard) {
+    navigator.clipboard.writeText(sku).then(() => showToast('SKU 已複製 ✓'));
+  } else {
+    const el = document.createElement('input');
+    el.value = sku; document.body.appendChild(el); el.select();
+    document.execCommand('copy'); document.body.removeChild(el);
+    showToast('SKU 已複製 ✓');
   }
 }
 
