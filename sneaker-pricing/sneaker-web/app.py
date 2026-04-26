@@ -15,6 +15,32 @@ from fastapi.responses import FileResponse, JSONResponse
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+_HOT_QUERIES = [
+    "熊貓 Dunk", "Samba", "AJ1 倒鉤", "Air Force 1",
+    "Yeezy 斑馬", "NB 550", "Speedcat", "Kayano 14", "NB 9060", "Campus 00s",
+]
+
+
+async def _warm_hot_cache() -> None:
+    loop = asyncio.get_event_loop()
+    for q in _HOT_QUERIES:
+        if not _cached(f"s:{q}"):
+            try:
+                result = await loop.run_in_executor(None, _do_search, q)
+                if "error" not in result:
+                    _store(f"s:{q}", result)
+            except Exception:
+                pass
+            await asyncio.sleep(3)
+
+
+async def _cache_warmer() -> None:
+    await asyncio.sleep(15)
+    while True:
+        await _warm_hot_cache()
+        await asyncio.sleep(3600)
+
+
 app = FastAPI(title="C&C 球鞋比價")
 app.add_middleware(
     CORSMiddleware,
@@ -262,6 +288,11 @@ async def cookie_status(x_admin_token: str = Header(default="")):
         c = _COOKIE_FILE.read_text(encoding="utf-8").strip()
         return JSONResponse({"source": "file", "length": len(c), "preview": c[:40] + "…"})
     return JSONResponse({"source": "env", "length": len(os.getenv("SHOPEE_COOKIE", ""))})
+
+
+@app.on_event("startup")
+async def startup():
+    asyncio.create_task(_cache_warmer())
 
 
 _static = Path(__file__).parent / "static"

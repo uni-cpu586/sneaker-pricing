@@ -1,5 +1,6 @@
 """數據採集器：從各平台抓取球鞋價格，全部回傳 TWD"""
 import json
+import random
 import re
 import requests
 from bs4 import BeautifulSoup
@@ -15,18 +16,36 @@ def _usd_to_twd(usd: float) -> int:
     return round(usd * get_rate("USD"))
 
 
-_NIKE_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+_UA_POOL = [
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Macintosh; Intel Mac OS X 14_4_1) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Safari/605.1.15",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64; rv:125.0) Gecko/20100101 Firefox/125.0",
+    "Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/123.0.0.0 Safari/537.36",
+    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36 Edg/120.0.0.0",
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Mobile/15E148 Safari/604.1",
+]
+
+
+def _rua() -> str:
+    return random.choice(_UA_POOL)
+
+
+def _h(base: dict) -> dict:
+    """回傳加上隨機 UA 的 header 副本"""
+    return {**base, "User-Agent": _rua()}
+
+
+_NIKE_BASE = {
     "Nike-Api-Caller-Id": "com.nike.commerce.nikedotcom.web",
 }
 
-_ABC_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+_ABC_BASE = {
     "Accept-Language": "ja,en;q=0.9",
 }
 
-_BROWSER_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+_BROWSER_BASE = {
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8",
     "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8,en;q=0.7",
     "Accept-Encoding": "gzip, deflate, br",
@@ -37,7 +56,7 @@ def scrape_abc_mart(keyword: str) -> dict:
     """搜尋 ABC-MART JP，回傳最低售價（JPY）"""
     search_url = f"https://www.abc-mart.net/shop/goods/search.aspx?keyword={keyword}"
     try:
-        res = requests.get(search_url, headers=_ABC_HEADERS, timeout=10)
+        res = requests.get(search_url, headers=_h(_ABC_BASE), timeout=10)
         res.raise_for_status()
         soup = BeautifulSoup(res.text, "html.parser")
 
@@ -88,7 +107,7 @@ def scrape_nike(sku: str) -> dict:
         ("count", "1"),
     ]
     try:
-        res = requests.get(url, params=params, headers=_NIKE_HEADERS, timeout=10)
+        res = requests.get(url, params=params, headers=_h(_NIKE_BASE), timeout=10)
         res.raise_for_status()
         objects = res.json().get("objects", [])
         if not objects:
@@ -156,12 +175,11 @@ def scrape_shopee(keyword: str) -> dict:
         f"?by=relevancy&keyword={quote(keyword)}&limit=20&newest=0&order=desc"
         f"&page_type=search&scenario=PAGE_GLOBAL_SEARCH&version=2"
     )
-    base_headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+    base_headers = _h({
         "Referer": search_url,
         "x-api-source": "pc",
         "Accept": "application/json",
-    }
+    })
 
     def _fetch(with_cookie: bool):
         h = {**base_headers}
@@ -198,7 +216,7 @@ def scrape_pchome(keyword: str) -> dict:
     """搜尋 PChome 24h，回傳平均售價（TWD）"""
     search_url = f"https://ecshweb.pchome.com.tw/search/v3.3/all/results?q={keyword}&page=1&sort=rnk/dc"
     try:
-        res = requests.get(search_url, headers=_ABC_HEADERS, timeout=10)
+        res = requests.get(search_url, headers=_h(_ABC_BASE), timeout=10)
         res.raise_for_status()
         prods = res.json().get("prods", []) or []
 
@@ -230,7 +248,7 @@ def scrape_yahoo_auctions(keyword: str) -> dict:
     """搜尋 Yahoo Auctions JP 在售商品，計算平均市場價（JPY）"""
     search_url = f"https://auctions.yahoo.co.jp/search/search?p={keyword}&va={keyword}&exflg=1&b=1&n=20&s1=cbids&o1=d&st=1"
     try:
-        res = requests.get(search_url, headers=_ABC_HEADERS, timeout=10)
+        res = requests.get(search_url, headers=_h(_ABC_BASE), timeout=10)
         res.raise_for_status()
         soup = BeautifulSoup(res.text, "html.parser")
 
@@ -264,8 +282,7 @@ def scrape_yahoo_auctions(keyword: str) -> dict:
                 "currency": "TWD", "status": f"error: {e}", "url": search_url}
 
 
-_MOMO_HEADERS = {
-    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36",
+_MOMO_BASE = {
     "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,image/avif,image/webp,*/*;q=0.8",
     "Accept-Language": "zh-TW,zh;q=0.9,en-US;q=0.8",
     "Accept-Encoding": "gzip, deflate, br",
@@ -290,7 +307,7 @@ def scrape_momo(keyword: str) -> dict:
             time.sleep(attempt * 2)
         try:
             sess = requests.Session()
-            sess.headers.update(_MOMO_HEADERS)
+            sess.headers.update(_h(_MOMO_BASE))
             res = sess.get(search_url, timeout=15)
             res.raise_for_status()
 
@@ -340,9 +357,7 @@ def scrape_adidas_tw(keyword: str) -> dict:
     try:
         with sync_playwright() as p:
             browser = p.chromium.launch(headless=True)
-            page = browser.new_page(
-                user_agent="Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
-            )
+            page = browser.new_page(user_agent=_rua())
 
             def _on_response(response):
                 url = response.url
