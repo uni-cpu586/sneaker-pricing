@@ -1,7 +1,9 @@
 """數據採集器：從各平台抓取球鞋價格，全部回傳 TWD"""
 import json
+import os
 import random
 import re
+import sys
 import requests
 from bs4 import BeautifulSoup
 from urllib.parse import quote
@@ -39,6 +41,60 @@ def _h(base: dict) -> dict:
 
 _UA_DESKTOP = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.0 Safari/537.36"
 _UA_MOBILE  = "Mozilla/5.0 (iPhone; CPU iPhone OS 17_4_1 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.4.1 Mobile/15E148 Safari/604.1"
+
+_SHOPEE_UA_LIST = [
+    _UA_MOBILE,
+    "Mozilla/5.0 (Linux; Android 14; Pixel 8) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/124.0.0.6 Mobile Safari/537.36",
+    "Mozilla/5.0 (iPhone; CPU iPhone OS 16_6 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/16.6 Mobile/15E148 Safari/604.1",
+]
+_shopee_ua_idx = 0
+_stats: dict = {}
+
+
+def _shopee_ua() -> str:
+    return _SHOPEE_UA_LIST[_shopee_ua_idx % len(_SHOPEE_UA_LIST)]
+
+
+def _notify(msg: str) -> None:
+    print(f"[HEALTH] {msg}", file=sys.stderr, flush=True)
+    url = os.getenv("NOTIFY_WEBHOOK_URL")
+    if url:
+        try:
+            requests.post(url, json={"text": msg}, timeout=5)
+        except Exception:
+            pass
+
+
+def _ok(platform: str) -> None:
+    s = _stats.setdefault(platform, {"ok": 0, "fail": 0, "consec_fail": 0})
+    s["ok"] += 1
+    s["consec_fail"] = 0
+
+
+def _fail(platform: str) -> None:
+    global _shopee_ua_idx
+    s = _stats.setdefault(platform, {"ok": 0, "fail": 0, "consec_fail": 0})
+    s["fail"] += 1
+    s["consec_fail"] += 1
+    if platform == "Shopee TW" and s["consec_fail"] >= 10:
+        _shopee_ua_idx += 1
+        s["consec_fail"] = 0
+        _notify(f"Shopee TW 連失敗 10 次，切換 UA → {_SHOPEE_UA_LIST[_shopee_ua_idx % len(_SHOPEE_UA_LIST)][:50]}")
+
+
+def _wrap(fn):
+    def wrapped(*args, **kwargs):
+        result = fn(*args, **kwargs)
+        platform = result.get("platform", "")
+        (_ok if result.get("status") == "ok" else _fail)(platform)
+        return result
+    wrapped.__name__ = fn.__name__
+    return wrapped
+
+
+def get_stats() -> dict:
+    return {k: dict(v) for k, v in _stats.items()}
+
 
 _NIKE_BASE = {
     "Nike-Api-Caller-Id": "com.nike.commerce.nikedotcom.web",
@@ -179,7 +235,7 @@ def scrape_shopee(keyword: str) -> dict:
         f"&page_type=search&scenario=PAGE_GLOBAL_SEARCH&version=2"
     )
     base_headers = {
-        "User-Agent": _UA_MOBILE,
+        "User-Agent": _shopee_ua(),
         "Referer": search_url,
         "x-api-source": "pc",
         "Accept": "application/json",
@@ -454,3 +510,13 @@ def scrape_stockx(keyword: str) -> dict:
 
     return {"platform": "StockX", "keyword": keyword, "price": None,
             "currency": "TWD", "status": "not_found", "url": search_url}
+
+
+scrape_abc_mart       = _wrap(scrape_abc_mart)
+scrape_nike           = _wrap(scrape_nike)
+scrape_shopee         = _wrap(scrape_shopee)
+scrape_pchome         = _wrap(scrape_pchome)
+scrape_yahoo_auctions = _wrap(scrape_yahoo_auctions)
+scrape_momo           = _wrap(scrape_momo)
+scrape_adidas_tw      = _wrap(scrape_adidas_tw)
+scrape_stockx         = _wrap(scrape_stockx)

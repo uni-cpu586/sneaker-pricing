@@ -1,6 +1,6 @@
 """C&C 球鞋比價 Web 後端"""
 from __future__ import annotations
-import asyncio, os, sys, time
+import asyncio, json, os, sys, time
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from pathlib import Path
 
@@ -72,16 +72,47 @@ _COLLAB_KEYWORDS = [
     "undercover", "acronym", "a-cold-wall", "fear of god",
 ]
 
-_cache: dict = {}
 _CACHE_TTL = 600
+_cache: dict = {}
+_redis = None
+_START_TIME = time.time()
+
+
+def _init_redis() -> None:
+    global _redis
+    url = os.getenv("REDIS_URL")
+    if not url:
+        return
+    try:
+        import redis as _redis_lib
+        r = _redis_lib.from_url(url, decode_responses=True)
+        r.ping()
+        _redis = r
+    except Exception:
+        pass
+
+
+_init_redis()
 
 
 def _cached(key: str):
+    if _redis:
+        try:
+            v = _redis.get(key)
+            return json.loads(v) if v else None
+        except Exception:
+            pass
     e = _cache.get(key)
     return e["v"] if e and time.time() - e["t"] < _CACHE_TTL else None
 
 
-def _store(key: str, val):
+def _store(key: str, val) -> None:
+    if _redis:
+        try:
+            _redis.setex(key, _CACHE_TTL, json.dumps(val, ensure_ascii=False))
+            return
+        except Exception:
+            pass
     _cache[key] = {"t": time.time(), "v": val}
 
 
@@ -244,6 +275,23 @@ async def api_suggest(q: str = ""):
     return JSONResponse(out[:7])
 
 
+@app.get("/api/health")
+async def api_health():
+    from src.scraper import get_stats
+    cache_size = len(_cache)
+    if _redis:
+        try:
+            cache_size = _redis.dbsize()
+        except Exception:
+            pass
+    return JSONResponse({
+        "uptime_s":      round(time.time() - _START_TIME),
+        "redis":         _redis is not None,
+        "cache_size":    cache_size,
+        "platform_stats": get_stats(),
+    })
+
+
 @app.get("/api/trending")
 async def api_trending():
     if cached := _cached("trending"):
@@ -288,9 +336,12 @@ async def update_shopee_cookie(
     if not cookie:
         raise HTTPException(status_code=400, detail="Cookie 不能是空的")
     _COOKIE_FILE.write_text(cookie, encoding="utf-8")
-    # 清掉 Shopee 相關 cache，讓下次查詢用新 cookie
-    for k in list(_cache.keys()):
-        del _cache[k]
+    _cache.clear()
+    if _redis:
+        try:
+            _redis.flushdb()
+        except Exception:
+            pass
     return JSONResponse({"ok": True, "length": len(cookie)})
 
 
