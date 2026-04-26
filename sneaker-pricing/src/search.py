@@ -101,6 +101,14 @@ CATALOG: Dict[str, Dict] = {
     "samba black":             {"sku": "B75807",     "abc_keyword": "SAMBA OG",        "yahoo_keyword": "adidas Samba OG Black B75807",         "pchome_keyword": "adidas Samba OG Black",              "shopee_keyword": "adidas Samba OG 黑色 B75807",           "name": "adidas Samba OG Black"},
     "samba wales bonner":      {"sku": None,         "abc_keyword": "SAMBA",           "yahoo_keyword": "adidas Samba Wales Bonner",            "pchome_keyword": "adidas Samba Wales Bonner",          "shopee_keyword": "adidas Samba Wales Bonner 聯名",        "name": "adidas Samba x Wales Bonner"},
     "samba kith":              {"sku": None,         "abc_keyword": "SAMBA",           "yahoo_keyword": "adidas Samba KITH",                    "pchome_keyword": "adidas Samba KITH",                  "shopee_keyword": "adidas Samba KITH 聯名",                "name": "adidas Samba x KITH"},
+    # ── adidas Samba 版型變體 ─────────────────────────────────────────────────
+    "samba vegan":             {"sku": None,         "abc_keyword": "SAMBA OG",        "yahoo_keyword": "adidas Samba OG Vegan",                "pchome_keyword": "adidas Samba Vegan",                 "shopee_keyword": "adidas Samba Vegan 純素",               "name": "adidas Samba OG Vegan"},
+    "samba classic":           {"sku": None,         "abc_keyword": "SAMBA",           "yahoo_keyword": "adidas Samba Classic",                 "pchome_keyword": "adidas Samba Classic",               "shopee_keyword": "adidas Samba Classic 足球",             "name": "adidas Samba Classic"},
+    "samba rm":                {"sku": None,         "abc_keyword": "SAMBA RM",        "yahoo_keyword": "adidas Samba RM Boost",                "pchome_keyword": "adidas Samba RM",                    "shopee_keyword": "adidas Samba RM Boost",                 "name": "adidas Samba RM"},
+    "samba xlg":               {"sku": None,         "abc_keyword": "SAMBA XLG",       "yahoo_keyword": "adidas Samba XLG",                     "pchome_keyword": "adidas Samba XLG",                   "shopee_keyword": "adidas Samba XLG 麵包鞋",               "name": "adidas Samba XLG"},
+    "samba decon":             {"sku": None,         "abc_keyword": "SAMBA DECON",     "yahoo_keyword": "adidas Samba Decon",                   "pchome_keyword": "adidas Samba Decon",                 "shopee_keyword": "adidas Samba Decon 解構",               "name": "adidas Samba Decon"},
+    "samba rose":              {"sku": None,         "abc_keyword": "SAMBA ROSE",      "yahoo_keyword": "adidas Samba Rose",                    "pchome_keyword": "adidas Samba Rose",                  "shopee_keyword": "adidas Samba Rose 厚底",                "name": "adidas Samba Rose"},
+    "samba sporty":            {"sku": None,         "abc_keyword": "SAMBA",           "yahoo_keyword": "adidas Samba Sporty Rich",             "pchome_keyword": "adidas Samba Sporty Rich",           "shopee_keyword": "adidas Samba Sporty Rich 聯名",         "name": "adidas Samba x Sporty & Rich"},
     # ── adidas Yeezy 全系列 ───────────────────────────────────────────────────
     "yeezy cream":             {"sku": "CP9366",     "abc_keyword": None,              "yahoo_keyword": "Yeezy 350 V2 Cream White CP9366",      "pchome_keyword": "Yeezy Boost 350 V2 Cream White",     "shopee_keyword": "Yeezy 350 V2 Cream Triple White",      "name": "adidas Yeezy Boost 350 V2 Cream White"},
     "yeezy beluga":            {"sku": "BB1826",     "abc_keyword": None,              "yahoo_keyword": "Yeezy 350 V2 Beluga BB1826",           "pchome_keyword": "Yeezy Boost 350 V2 Beluga",          "shopee_keyword": "Yeezy 350 V2 Beluga",                  "name": "adidas Yeezy Boost 350 V2 Beluga"},
@@ -278,6 +286,23 @@ _ALIASES: Dict[str, str] = {
     "wales bonner samba":"samba wales bonner",
     "wales bonner":      "samba wales bonner",
     "samba kith":        "samba kith",
+    # adidas Samba 版型變體
+    "vegan samba":       "samba vegan",
+    "samba vegan":       "samba vegan",
+    "pure boost samba":  "samba rm",
+    "rm samba":          "samba rm",
+    "xlg":               "samba xlg",
+    "samba xlg":         "samba xlg",
+    "麵包森巴":          "samba xlg",
+    "decon":             "samba decon",
+    "samba decon":       "samba decon",
+    "解構森巴":          "samba decon",
+    "rose samba":        "samba rose",
+    "森巴rose":          "samba rose",
+    "sporty rich":       "samba sporty",
+    "sporty & rich":     "samba sporty",
+    "sporty rich samba": "samba sporty",
+    "samba sporty":      "samba sporty",
     # adidas Yeezy
     "yeezy 350":         "斑馬",
     "yeezy cream":       "yeezy cream",
@@ -453,11 +478,18 @@ _FAMILY_GROUPS: Dict[str, List[tuple]] = {
         ("af1 high",        "High"),
     ],
     "samba": [
-        ("samba",             "OG"),
-        ("samba black",       "黑"),
-        ("samba wales bonner","Wales Bonner"),
-        ("samba kith",        "KITH"),
-        ("bad bunny samba",   "Bad Bunny"),
+        ("samba",              "OG"),
+        ("samba vegan",        "Vegan"),
+        ("samba classic",      "Classic"),
+        ("samba rm",           "RM"),
+        ("samba xlg",          "XLG"),
+        ("samba decon",        "Decon"),
+        ("samba rose",         "Rose"),
+        ("samba black",        "黑"),
+        ("samba wales bonner", "Wales Bonner"),
+        ("samba sporty",       "Sporty & Rich"),
+        ("samba kith",         "KITH"),
+        ("bad bunny samba",    "Bad Bunny"),
     ],
     "yeezy350": [
         ("斑馬",           "斑馬"),
@@ -508,6 +540,56 @@ _KEY_TO_FAMILY: Dict[str, Tuple[str, str]] = {
     for family, members in _FAMILY_GROUPS.items()
     for key, label in members
 }
+
+# ── Samba 家族 Anchor Token 消歧義表 ─────────────────────────────────────────
+# 格式：(catalog_key, 正向錨點, 負向錨點)
+# 正向：ALL 都必須在查詢中 | 負向：ANY 出現即排除 | 順序：越具體越前面
+_SAMBA_ANCHORS: List[Tuple[str, List[str], List[str]]] = [
+    ("samba wales bonner", ["wales"],           []),
+    ("samba sporty",       ["sporty"],          []),
+    ("samba kith",         ["kith"],            []),
+    ("bad bunny samba",    ["bad bunny"],       []),
+    ("samba xlg",          ["xlg"],             []),
+    ("samba decon",        ["decon"],           []),
+    ("samba rose",         ["rose"],            []),
+    ("samba rm",           ["rm"],              []),
+    ("samba classic",      ["classic"],         []),
+    ("samba vegan",        ["vegan"],           []),
+    ("samba black",        ["black"],           ["vegan", "xlg", "rose", "classic", "rm", "wales", "sporty", "kith", "decon"]),
+    ("samba",              ["samba"],           ["vegan", "xlg", "rose", "classic", "rm", "wales", "sporty", "kith", "decon", "black"]),
+]
+
+# ── 平台搜尋結果品項過濾錨點 ─────────────────────────────────────────────────
+# 供 scraper 過濾搜尋結果：品項名稱必須含所有 positive、不含任何 negative
+_RESULT_FILTERS: Dict[str, Dict[str, List[str]]] = {
+    "熊貓dunk":      {"positive": ["dunk", "low", "black", "white"], "negative": ["next nature", "high", "sb"]},
+    "samba":         {"positive": ["samba", "og"],                   "negative": ["vegan", "xlg", "rose", "classic"]},
+    "倒鉤":          {"positive": ["jordan 1", "low"],               "negative": ["mid", "high"]},
+    "空軍":          {"positive": ["force 1", "white", "07"],        "negative": ["supreme", "mid", "high"]},
+    "斑馬":          {"positive": ["yeezy", "350", "zebra"],         "negative": ["v1", "cmpct"]},
+    "550":           {"positive": ["550"],                           "negative": ["ald", "aime", "suede"]},
+    "speedcat":      {"positive": ["speedcat"],                      "negative": ["ls", "sparco"]},
+    "gel-kayano 14": {"positive": ["kayano", "14"],                  "negative": ["jjjjound", "gore-tex"]},
+    "9060":          {"positive": ["9060"],                          "negative": ["joe freshgoods", "jfg"]},
+    "campus":        {"positive": ["campus", "00s"],                 "negative": ["korn", "bad bunny"]},
+}
+
+
+def get_result_filter(catalog_key: Optional[str]) -> Optional[Dict[str, List[str]]]:
+    """回傳指定 catalog key 的品項過濾錨點，無設定則回傳 None"""
+    return _RESULT_FILTERS.get(catalog_key) if catalog_key else None
+
+
+def _resolve_samba(q: str) -> Optional[str]:
+    """查詢含 'samba' 或 '森巴' 時，依 Anchor Token 消歧義，回傳 catalog key"""
+    if "samba" not in q and "森巴" not in q:
+        return None
+    for key, positives, negatives in _SAMBA_ANCHORS:
+        if key not in CATALOG:
+            continue
+        if all(p in q for p in positives) and not any(n in q for n in negatives):
+            return key
+    return None
 
 
 def get_siblings(catalog_key: Optional[str]) -> List[Dict]:
@@ -585,6 +667,13 @@ def search_product(query: str) -> Optional[Dict]:
     """輸入中文暱稱、品牌名、英文型號或 SKU，回傳鞋款資訊"""
     q = query.strip()
     q_lower = q.lower()
+
+    # 0. Samba 家族 Anchor Token 消歧義（優先於一般比對）
+    samba_key = _resolve_samba(q_lower)
+    if samba_key:
+        entry = CATALOG.get(samba_key)
+        if entry:
+            return {"query": query, "_key": samba_key, **entry}
 
     # 1. 直接比對 catalog key
     _k1 = q if q in CATALOG else (q_lower if q_lower in CATALOG else None)
