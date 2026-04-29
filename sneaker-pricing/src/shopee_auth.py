@@ -42,14 +42,18 @@ def save_cookie_to_supabase(cookie: str) -> bool:
 # ── Playwright 登入 ──────────────────────────────────────────────────────────
 
 def playwright_login() -> Optional[str]:
-    """用 Playwright 登入蝦皮，回傳 cookie 字串；失敗回傳 None"""
+    """用 Playwright 登入蝦皮，回傳 cookie 字串；未安裝 playwright 或失敗回傳 None"""
+    try:
+        from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
+    except ImportError:
+        logger.warning("playwright 未安裝，略過自動登入（請在本機執行 scripts/shopee_login.py）")
+        return None
+
     email    = os.getenv("SHOPEE_EMAIL", "")
     password = os.getenv("SHOPEE_PASSWORD", "")
     if not email or not password:
         logger.error("未設定 SHOPEE_EMAIL / SHOPEE_PASSWORD")
         return None
-
-    from playwright.sync_api import sync_playwright, TimeoutError as PWTimeout
 
     with sync_playwright() as p:
         browser = p.chromium.launch(
