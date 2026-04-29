@@ -101,7 +101,8 @@ _NIKE_BASE = {
 }
 
 _ABC_BASE = {
-    "Accept-Language": "ja,en;q=0.9",
+    "Accept-Language": "ja-JP,ja;q=0.9,en;q=0.8",
+    "Referer": "https://www.abc-mart.net/",
 }
 
 _BROWSER_BASE = {
@@ -198,17 +199,9 @@ def scrape_nike(sku: str) -> dict:
 
 
 def _load_shopee_cookie() -> str:
-    """優先讀 shopee_cookie.txt，再 fallback .env SHOPEE_COOKIE"""
-    import os
-    from pathlib import Path
-    from dotenv import load_dotenv
-    load_dotenv()
-    cookie_file = Path(__file__).parent.parent / "shopee_cookie.txt"
-    if cookie_file.exists():
-        c = cookie_file.read_text(encoding="utf-8").strip()
-        if c:
-            return c
-    return os.getenv("SHOPEE_COOKIE", "").strip()
+    """優先從 Supabase 讀，再 fallback 本地檔 / env var"""
+    from src.shopee_auth import get_cookie
+    return get_cookie()
 
 
 def _parse_shopee_items(items: list) -> list:
@@ -237,7 +230,7 @@ def scrape_shopee(keyword: str) -> dict:
     base_headers = {
         "User-Agent": _shopee_ua(),
         "Referer": search_url,
-        "x-api-source": "pc",
+        "x-api-source": "m",
         "Accept": "application/json",
     }
 
@@ -249,9 +242,16 @@ def scrape_shopee(keyword: str) -> dict:
 
     try:
         d = _fetch(with_cookie=True)
-        # cookie 過期時 fallback 訪客模式
-        if d.get("error") == 90309999 and cookie_str:
-            d = _fetch(with_cookie=False)
+        # cookie 過期：嘗試 Playwright 重新登入一次
+        if d.get("error") == 90309999:
+            _notify("Shopee cookie 過期，嘗試 Playwright 自動重新登入")
+            from src.shopee_auth import refresh_cookie
+            new_cookie = refresh_cookie()
+            if new_cookie:
+                cookie_str = new_cookie
+                d = _fetch(with_cookie=True)
+            else:
+                d = _fetch(with_cookie=False)
         if d.get("error"):
             return {"platform": "Shopee TW", "keyword": keyword, "price": None,
                     "currency": "TWD", "status": "error", "url": search_url}
@@ -471,45 +471,50 @@ def scrape_adidas_tw(keyword: str) -> dict:
 def scrape_stockx(keyword: str) -> dict:
     """搜尋 StockX，回傳最低賣出價（TWD，原幣 USD）"""
     search_url = f"https://stockx.com/search?s={quote(keyword)}"
+    app_id = os.getenv("STOCKX_ALGOLIA_APP_ID", "XW7SBCT9V6")
+    api_key = os.getenv("STOCKX_ALGOLIA_API_KEY", "6b5e76b49705eb9f51a06d3c82f7acee")
     try:
         res = requests.post(
-            "https://xw7sbct9v6-dsn.algolia.net/1/indexes/products/query",
+            f"https://{app_id.lower()}-dsn.algolia.net/1/indexes/products/query",
             headers={
-                "X-Algolia-Application-Id": "XW7SBCT9V6",
-                "X-Algolia-API-Key": "6b5e76b49705eb9f51a06d3c82f7acee",
+                "X-Algolia-Application-Id": app_id,
+                "X-Algolia-API-Key": api_key,
                 "Content-Type": "application/json",
             },
             json={"params": f"query={keyword}&hitsPerPage=10"},
             timeout=10,
         )
-        if res.status_code == 200:
-            hits = res.json().get("hits", [])
-            image_url = (hits[0].get("media") or {}).get("imageUrl") if hits else None
-            prices_usd = [
-                h["market"]["lowestAsk"]
-                for h in hits
-                if (h.get("market") or {}).get("lowestAsk", 0) > 0
-            ]
-            if prices_usd:
-                avg_usd = sum(prices_usd) / len(prices_usd)
-                rate = get_rate("USD")
-                return {
-                    "platform": "StockX",
-                    "keyword": keyword,
-                    "price": _usd_to_twd(avg_usd),
-                    "price_min": _usd_to_twd(min(prices_usd)),
-                    "price_max": _usd_to_twd(max(prices_usd)),
-                    "sample_count": len(prices_usd),
-                    "currency": "TWD",
-                    "status": "ok",
-                    "url": search_url,
-                    "image_url": image_url,
-                }
-    except Exception:
-        pass
-
-    return {"platform": "StockX", "keyword": keyword, "price": None,
-            "currency": "TWD", "status": "not_found", "url": search_url}
+        if res.status_code == 403:
+            _notify(f"StockX Algolia key 失效（403），請更新 STOCKX_ALGOLIA_API_KEY")
+            return {"platform": "StockX", "keyword": keyword, "price": None,
+                    "currency": "TWD", "status": "error: algolia key invalid", "url": search_url}
+        res.raise_for_status()
+        hits = res.json().get("hits", [])
+        image_url = (hits[0].get("media") or {}).get("imageUrl") if hits else None
+        prices_usd = [
+            h["market"]["lowestAsk"]
+            for h in hits
+            if (h.get("market") or {}).get("lowestAsk", 0) > 0
+        ]
+        if prices_usd:
+            avg_usd = sum(prices_usd) / len(prices_usd)
+            return {
+                "platform": "StockX",
+                "keyword": keyword,
+                "price": _usd_to_twd(avg_usd),
+                "price_min": _usd_to_twd(min(prices_usd)),
+                "price_max": _usd_to_twd(max(prices_usd)),
+                "sample_count": len(prices_usd),
+                "currency": "TWD",
+                "status": "ok",
+                "url": search_url,
+                "image_url": image_url,
+            }
+        return {"platform": "StockX", "keyword": keyword, "price": None,
+                "currency": "TWD", "status": "not_found", "url": search_url}
+    except Exception as e:
+        return {"platform": "StockX", "keyword": keyword, "price": None,
+                "currency": "TWD", "status": f"error: {e}", "url": search_url}
 
 
 scrape_abc_mart       = _wrap(scrape_abc_mart)

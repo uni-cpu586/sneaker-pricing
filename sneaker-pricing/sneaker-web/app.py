@@ -335,7 +335,32 @@ async def update_shopee_cookie(
     cookie = payload.cookie.strip()
     if not cookie:
         raise HTTPException(status_code=400, detail="Cookie 不能是空的")
+    from src.shopee_auth import save_cookie_to_supabase
+    save_cookie_to_supabase(cookie)
     _COOKIE_FILE.write_text(cookie, encoding="utf-8")
+    _cache.clear()
+    if _redis:
+        try:
+            _redis.flushdb()
+        except Exception:
+            pass
+    return JSONResponse({"ok": True, "length": len(cookie)})
+
+
+@app.post("/admin/refresh-shopee-cookie")
+async def refresh_shopee_cookie(x_admin_token: str = Header(default="")):
+    expected = os.getenv("ADMIN_TOKEN", "")
+    if not expected or x_admin_token != expected:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+    loop = asyncio.get_event_loop()
+
+    def _do_refresh():
+        from src.shopee_auth import refresh_cookie
+        return refresh_cookie()
+
+    cookie = await loop.run_in_executor(None, _do_refresh)
+    if not cookie:
+        raise HTTPException(status_code=500, detail="Playwright 登入失敗，請確認 SHOPEE_EMAIL / SHOPEE_PASSWORD")
     _cache.clear()
     if _redis:
         try:
@@ -350,6 +375,11 @@ async def cookie_status(x_admin_token: str = Header(default="")):
     expected = os.getenv("ADMIN_TOKEN", "")
     if not expected or x_admin_token != expected:
         raise HTTPException(status_code=401, detail="Unauthorized")
+
+    from src.shopee_auth import load_cookie_from_supabase
+    sb_cookie = load_cookie_from_supabase()
+    if sb_cookie:
+        return JSONResponse({"source": "supabase", "length": len(sb_cookie), "preview": sb_cookie[:40] + "…"})
     if _COOKIE_FILE.exists():
         c = _COOKIE_FILE.read_text(encoding="utf-8").strip()
         return JSONResponse({"source": "file", "length": len(c), "preview": c[:40] + "…"})
